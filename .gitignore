@@ -1,4 +1,5 @@
 # Ignore misc. compilation files
+
 *.f90 
 *.o 
 *.a 
