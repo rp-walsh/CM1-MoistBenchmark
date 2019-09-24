@@ -1,0 +1,15 @@
+# Ignore misc. compilation files
+*.f90 
+*.o 
+*.a 
+*.mod
+
+# Ignore data files
+*.nc
+
+# Ignore emacs autosaves
+*~
+
+# Ignore OS files
+*.DS_Store
+

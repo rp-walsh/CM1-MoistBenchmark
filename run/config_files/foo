@@ -1,0 +1,121 @@
+.:
+total 32
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 18:29 cpm_RadConvEquil
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 18:29 dns_RayleighBenard
+-rw-r--r-- 1 gbryan ncar    0 Aug  3 16:57 foo
+drwxr-xr-x 2 gbryan ncar 4096 Jul  8 09:00 hurricane_3d
+drwxr-xr-x 2 gbryan ncar 4096 Jul  8 09:00 hurricane_axisymmetric
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:02 les_ConvBoundLayer
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 18:30 les_HurrBoundLayer
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 18:30 les_ShallowCu
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 18:30 les_ShallowCuPrecip
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:00 les_ShearBoundLayer
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:00 les_StratoCuDrizzle
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:01 les_StratoCuNoPrecip
+-rw-r--r-- 1 gbryan ncar 6790 Jun 17 18:29 namelist.input
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:01 nh_mountain_waves
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:01 scm_HurrBoundLayer
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:01 sea_breeze
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:01 squall_line
+drwxr-xr-x 2 gbryan ncar 4096 Jun 17 20:01 supercell
+
+./cpm_RadConvEquil:
+total 1537
+-rw-r--r-- 1 gbryan ncar    869 Nov 17  2017 input_sounding
+-rw-r--r-- 1 gbryan ncar   5125 Nov 17  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar   6796 Jun 17 18:29 namelist.input
+-rw-r--r-- 1 gbryan ncar    141 Nov 25  2017 README
+-r--r--r-- 1 gbryan ncar 847552 Nov 17  2017 RRTMG_LW_DATA
+-r--r--r-- 1 gbryan ncar 680368 Nov 17  2017 RRTMG_SW_DATA
+
+./dns_RayleighBenard:
+total 17
+-rw-r--r-- 1 gbryan ncar 6793 Jun 17 18:29 namelist.input
+-rw-r--r-- 1 gbryan ncar  126 Jun 15  2017 README
+
+./hurricane_3d:
+total 33
+-rw-r--r-- 1 gbryan ncar  869 May  9  2017 input_sounding
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6797 Jul  8 09:00 namelist.input
+-rw-r--r-- 1 gbryan ncar  317 Jun 15  2017 README
+
+./hurricane_axisymmetric:
+total 33
+-rw-r--r-- 1 gbryan ncar  869 May  9  2017 input_sounding
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6798 Jul  8 09:00 namelist.input
+-rw-r--r-- 1 gbryan ncar  327 Jun 15  2017 README
+
+./les_ConvBoundLayer:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6767 Jun 17 20:02 namelist.input
+-rw-r--r-- 1 gbryan ncar  125 Jun 15  2017 README
+
+./les_HurrBoundLayer:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6766 Jun 17 18:30 namelist.input
+-rw-r--r-- 1 gbryan ncar  121 Jun 15  2017 README
+
+./les_ShallowCu:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6767 Jun 17 18:30 namelist.input
+-rw-r--r-- 1 gbryan ncar  210 Jun 15  2017 README
+
+./les_ShallowCuPrecip:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 Nov  8  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6773 Jun 17 18:30 namelist.input
+-rw-r--r-- 1 gbryan ncar  237 Nov  8  2017 README
+
+./les_ShearBoundLayer:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6767 Jun 17 20:00 namelist.input
+-rw-r--r-- 1 gbryan ncar  130 Jun 15  2017 README
+
+./les_StratoCuDrizzle:
+total 33
+-rw-r--r-- 1 gbryan ncar  768 May  9  2017 input_grid_z
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6789 Jun 17 20:00 namelist.input
+-rw-r--r-- 1 gbryan ncar  266 Jun 15  2017 README
+
+./les_StratoCuNoPrecip:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6783 Jun 17 20:01 namelist.input
+-rw-r--r-- 1 gbryan ncar  288 Jun 15  2017 README
+
+./nh_mountain_waves:
+total 17
+-rw-r--r-- 1 gbryan ncar 6767 Jun 17 20:01 namelist.input
+-rw-r--r-- 1 gbryan ncar   92 Jun 15  2017 README
+
+./scm_HurrBoundLayer:
+total 33
+-rw-r--r-- 1 gbryan ncar 5125 Nov 24  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar 6766 Jun 17 20:01 namelist.input
+-rw-r--r-- 1 gbryan ncar  123 Nov 24  2017 README
+
+./sea_breeze:
+total 1553
+-rw-r--r-- 1 gbryan ncar   6126 May  9  2017 input_sounding
+-rw-r--r-- 1 gbryan ncar   5125 May  9  2017 LANDUSE.TBL
+-rw-r--r-- 1 gbryan ncar   6772 Jun 17 20:01 namelist.input
+-rw-r--r-- 1 gbryan ncar     63 Jun 15  2017 README
+-rw-r--r-- 1 gbryan ncar 847552 Jun 16  2017 RRTMG_LW_DATA
+-rw-r--r-- 1 gbryan ncar 680368 Jun 16  2017 RRTMG_SW_DATA
+
+./squall_line:
+total 17
+-rw-r--r-- 1 gbryan ncar 6790 Jun 17 20:01 namelist.input
+-rw-r--r-- 1 gbryan ncar  146 Jun 15  2017 README
+
+./supercell:
+total 17
+-rw-r--r-- 1 gbryan ncar 6790 Jun 17 20:01 namelist.input
+-rw-r--r-- 1 gbryan ncar  157 Jun 15  2017 README
