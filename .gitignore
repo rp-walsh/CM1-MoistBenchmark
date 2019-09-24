@@ -1,0 +1,8 @@
+# Ignore compliation files
+*.f90 
+*.o 
+*.a 
+*.mod
+
+# Ignore data files
+*.nc
