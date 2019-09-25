@@ -329,11 +329,33 @@
       read(20,nml=param0)
       read(20,nml=param2)
       read(20,nml=param8)
+      read(20,nml=MBMparam)
       close(unit=20)
 
       ! note:  read remainder of namelist sections in param.F !
 
 !----------------------------------------------------------------------
+!  Ray's input parsing and variable assignment
+
+      print *,'  MBM_P0 = ', MBM_P0
+      print *,'  MBM_T0 = ', MBM_T0
+      print *,'  MBM_HScale = ', MBM_HScale
+      print *,'  MBM_LScale = ', MBM_LScale
+      print *,'  MBM_UScale = ', MBM_UScale
+      print *,'  MBM_alpha = ', MBM_alpha
+      print *,'  MBM_zB = ', MBM_zB
+      print *,'  MBM_zT = ', MBM_zT
+      print *,'  MBM_ns = ', MBM_ns
+      print *,'  MBM_thsfu = ', MBM_thsfc
+      print *,'  MBM_pisfc = ', MBM_pisfc
+      print *,'  P00 = ', P00
+
+      p00 = MBM_P0
+      rp00 = 1/p00
+
+      print *,'  P00 = ', P00
+
+      read(*,*) 
 
       IF( procfiles )THEN
 #ifdef MPI
