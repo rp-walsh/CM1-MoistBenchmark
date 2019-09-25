@@ -70,7 +70,7 @@
  tbc       =  1,
  irbc      =  4,
  roflux    =  0,
- isnd      = 22,
+ isnd      = 1000,
  iwnd      =  0,
  itern     =  0,
  iinit     =  1,
