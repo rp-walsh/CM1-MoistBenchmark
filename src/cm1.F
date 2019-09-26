@@ -335,7 +335,7 @@
       ! note:  read remainder of namelist sections in param.F !
 
 !----------------------------------------------------------------------
-!  Ray's input parsing and variable assignment
+!  RPW's input parsing and variable assignment
 
       print *,'  MBM_P0 = ', MBM_P0
       print *,'  MBM_T0 = ', MBM_T0
@@ -353,7 +353,7 @@
       p00 = MBM_P0
       rp00 = 1/p00
 
-      print *,'  P00 = ', P00
+      print *,'after setting  P00 = ', P00
 
       read(*,*) 
 

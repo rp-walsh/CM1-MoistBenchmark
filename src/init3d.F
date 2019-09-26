@@ -414,11 +414,31 @@
         !-----------------------------------!
 
 !-----------------------------------------------------------------------
+!     iinit = 9999 (RPW)
+!     Used for trivial initialization
+!     
+
+
+    IF(iinit.eq.9999)THEN
+
+       do k=1,nk+1
+          do j=1,nj+1
+             do i=1,ni+1
+                qa(i,j,k,nqc) = qc0(i,j,k)
+             enddo
+          enddo
+       enddo
+
+       call bcu(ua)
+       call bcw(wa,1)
+
+
+!-----------------------------------------------------------------------
 !  iinit = 1
 !  Warm bubble
 !  reference:
 
-      IF(iinit.eq.1)THEN
+      ELSEIF(iinit.eq.1)THEN
 
         if(dowr) write(outfile,*)
         if(dowr) write(outfile,*) '  Warm bubble'
