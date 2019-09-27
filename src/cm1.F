@@ -348,6 +348,8 @@
       print *,'  MBM_ns = ', MBM_ns
       print *,'  MBM_thsfu = ', MBM_thsfc
       print *,'  MBM_pisfc = ', MBM_pisfc
+      print *,'  MBM_epsW = ', MBM_epsW
+      print *,'  MBM_omega = ', MBM_omega
       print *,'  P00 = ', P00
 
       p00 = MBM_P0
@@ -355,7 +357,6 @@
 
       print *,'after setting  P00 = ', P00
 
-      read(*,*) 
 
       IF( procfiles )THEN
 #ifdef MPI

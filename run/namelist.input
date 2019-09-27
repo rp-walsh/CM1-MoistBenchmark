@@ -70,7 +70,7 @@
  tbc       =  1,
  irbc      =  4,
  roflux    =  0,
- isnd      = 1000,
+ isnd      = 1002,
  iwnd      =  0,
  itern     =  0,
  iinit     = 9999,
@@ -197,17 +197,19 @@
  MBM_HScale =   95.941426956266568,  ! HScale
  MBM_LScale =   61.827875768071465,  ! LScale	
  MBM_UScale =   0.18, ! UScale	
- MBM_alpha  =   1.0, ! alpha (mst_grad)
+ MBM_alpha  =   -1.0, ! alpha (mst_grad)
  MBM_zB     =   -2.069920410812692, ! zB (CCL bottom shift)
- MBM_zT     =   -2.069920410812692, ! zT (CCL bottom shift)
+ MBM_zT     =   pi, ! zT (CCL bottom shift)
  MBM_ns     =   2.84E-4, !Dimensional BVF
  MBM_thsfc  =   271.8778003616573, ! th_sfc (consistent with CCL backgrounds)
  MBM_pisfc  =   1.007104586404201, ! pi_sfc (consistent with CCL backgrounds)
+ MBM_epsW   =   0.1
+ MBM_omega  =   0.487993922922780
  /
 
  &param9
  output_path      = 'MBBMResults/BaseTsts/',
- output_basename  = 'CritSatBase',
+ output_basename  = 'ClearOvCloudBase',
  output_format    = 2,
  output_filetype  = 1,
  output_interp    = 0,

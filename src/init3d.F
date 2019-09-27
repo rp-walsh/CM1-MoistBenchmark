@@ -169,6 +169,21 @@
       double precision :: tem1,tem2,temd,dtem1,dtem2
       logical :: doit
 
+!------------------------------------------------------------------
+      real :: ns, p_sfc, qv_sfc, thlast, thv_sfc, delz
+      real, dimension(ib:ie,jb:je,kb:ke) :: piSat, prsSat, thvSat
+      real, dimension(ib:ie,jb:je,kb:ke) :: thSat, qvSat, tSat
+      
+      real :: alpha, BuC, epsln, epslnl, Gambar, H, H0, kwv, Lambda
+      real :: LiqC, Lscl, mClear, mCloud, mu, muScl, nbs, om, P0, psiCloud_z
+      real :: PertMag, Phi, pow1, pow2, psiClear, psiCloud, psiClear_z
+      real :: rbar_z, rlCloud, rlp, rlTilde, rTback, rtClear, rtCloud, rtp
+      real :: rTTilde, ScrpL, sig, tau, tback, that, thetaClear, thetaCloud
+      real :: thl0, thlHat, thlTot, thp, tTot, uClear, uCloud, up, UScale
+      real :: wClear, wCloud, wp, xp, xpf, zB, zp, zpf
+      complex :: CmplxPhaseShift
+!------------------------------------------------------------------
+
 !--------------------------
 
       if(dowr) write(outfile,*) 'Inside INIT3D'
@@ -414,6 +429,171 @@
         !-----------------------------------!
 
 !-----------------------------------------------------------------------
+!     Construct critically saturated background for MBBM initialization
+!     Used for multiple initializations (RPW)
+!     
+
+        IF(iinit.eq.1000.or.iinit.eq.1001.or.iinit.eq.1002)THEN
+           
+           !-----------------------------------------------------------------------
+           ! The leading order cloud layer for the TIR benchmark has been placed in
+           ! base state (isnd=1000). This means the base defined for this case is not
+           ! critically saturated. In order to define the correct additive perturbations
+           ! we need to redefine the critically saturated background. There are a 
+           ! couple possible choices for this:
+           ! 1. Recalculate it here consistent with cm1.
+           ! 2. Use CCL definations. They are probably close enough for the perturbation
+           !    initialization.
+           ! 3. Modify cm1 so that it's capable of passing the critically sat base 
+           !    to init3d.F.
+           !-----------------------------------------------------------------------
+           
+           !-----------------------------------------------------------------------
+           ! Recalculate critically saturated background consistent with cm1
+           !-----------------------------------------------------------------------
+           
+           ! Define Brunt-Vaisala frequency N^2
+           ns =  MBM_ns
+           
+           ! Define Surface conditions
+           th_sfc   =  MBM_thsfc
+           pi_sfc   =  MBM_pisfc
+           !-----
+           p_sfc=p00*(pi_sfc**(cp/rd))
+           t_sfc=th_sfc*pi_sfc
+           qv_sfc=rslf(p_sfc,t_sfc)
+           thv_sfc=th_sfc*(1.0+reps*qv_sfc)/(1.0+qv_sfc)
+           
+           do kk=kb,ke
+              do jj=jb,je
+                 do ii=ib,ie
+                    ! DEFINE \theta_v here for constant Nm^2 (unsaturated)
+                    thvSat(ii,jj,kk) = thv_sfc*exp(ns/g*zh(ii,jj,kk));
+                 enddo
+              enddo
+           enddo
+           
+           do j=jb,je
+              do i=ib,ie
+                 
+                 !---------- do k=1 first ----------!
+                 k=1
+                 n=1
+                 
+                 ! Discretely step pressure forward
+                 piSat(i,j,k)=pi_sfc-g*zh(i,j,k)/(cp*0.5*(thvSat(i,j,k)+thv_sfc))
+                 prsSat(i,j,k)=p00*(piSat(i,j,k)**(cp/rd))
+                               
+                 ! Initial guess for moisture profile at zh(i,j,1)
+                 qvSat(i,j,k)=qv_sfc
+                 
+                 ! Initial theta at zh(i,j,1)
+                 thSat(i,j,k) = thvSat(i,j,k)*(1 + qvSat(i,j,k))/(1 + reps*qvSat(i,j,k))
+                 
+                 ! Nonlinear-loop for theta
+891              continue
+                 
+                 ! Update tempreature
+                 tSat(i,j,k) = thSat(i,j,k)*piSat(i,j,k)
+                 
+                 ! Update moisture profile
+                 qvSat(i,j,k)=rslf(prsSat(i,j,k),tSat(i,j,k))
+                 
+                 ! Update Theta
+                 thlast = thSat(i,j,k)
+                 thSat(i,j,k) = thvSat(i,j,k)*(1 + qvSat(i,j,k))/(1 + reps*qvSat(i,j,k))
+                 
+                 n=n+1
+                 
+                 !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+                 if(abs(thSat(i,j,k)-thlast).gt.0.0001 .and. n.lt.200)then
+                    thSat(i,j,k)=thlast+0.3*(thSat(i,j,k)-thlast)
+                    go to 891
+                 elseif(n.ge.200)then
+                    if(dowr) write(outfile,*) '  stuck in loop (111)!'
+                    call stopcm1
+                 endif
+                 
+                 ! Update Temperature and moisture to match theta
+                 tSat(i,j,k)=thSat(i,j,k)*piSat(i,j,k)
+                 qvSat(i,j,k)=rslf(prsSat(i,j,k),tSat(i,j,k))
+                 
+                 if(qc0(i,j,1).lt.0.0)then
+                    print *,'  calling stopcm1 (222) '
+                    call stopcm1
+                 endif
+                 !if(i.eq.1.and.j.eq.1.and.dowr) write(outfile,*) k,n,th0(i,j,k),prs0(i,j,k)
+                 
+                 !---------- done with k=1, do all other levels ----------!
+                 
+                 do k=2,nk
+                    
+                    n=1
+                    delz=zh(i,j,k)-zh(i,j,k-1)
+                    
+                    ! Discretely step pressure forward
+                    piSat(i,j,k)=piSat(i,j,k-1) - g*delz/(cp*0.5*(thvSat(i,j,k)+thvSat(i,j,k-1)))
+                    prsSat(i,j,k)=p00*(piSat(i,j,k)**(cp/rd))
+                    !prsSat(i,j,k)=var5*(piSat(i,j,k)**(cp/rd))
+                    
+                    ! Initial guess for moisture profile at zh(i,j,k)
+                    qvSat(i,j,k)=qvSat(i,j,k-1)
+                    
+                    ! Initial theta at zh(i,j,k)
+                    thSat(i,j,k) = thvSat(i,j,k)*(1 + qvSat(i,j,k))/(1 + reps*qvSat(i,j,k))
+                    
+                    ! Nonlinear-loop for theta
+892                 continue
+                    
+                    ! Update tempreature
+                    tSat(i,j,k) = thSat(i,j,k)*piSat(i,j,k)
+                    
+                    ! Update moisture profile
+                    qvSat(i,j,k)=rslf(prsSat(i,j,k),tSat(i,j,k))
+                    
+                    ! Update Theta
+                    thlast = thSat(i,j,k)
+                    thSat(i,j,k) = thvSat(i,j,k)*(1 + qvSat(i,j,k))/(1 + reps*qvSat(i,j,k))
+                    
+                    n=n+1
+                    
+                    !if(n.gt.180.and.dowr) write(outfile,*) n,prs0(i,j,k),thlast,th0(i,j,k),th0(i,j,k)-thlast
+                    if(abs(thSat(i,j,k)-thlast).gt.0.0005 .and. n.lt.200)then
+                       thSat(i,j,k)=thlast+0.3*(thSat(i,j,k)-thlast)
+                       go to 892
+                    elseif(n.ge.200)then
+                       if(dowr) write(outfile,*) '  stuck in loop (333)!'
+                       !print *,'  prs,thlast,thn = ',prsSat(i,j,k),thlast,thn
+                       call stopcm1
+                    endif
+                    
+                    ! Update Temperature and moisture to match theta
+                    tSat(i,j,k)=thSat(i,j,k)*piSat(i,j,k)
+                    qvSat(i,j,k)=rslf(prsSat(i,j,k),tSat(i,j,k))
+                    
+                    !write( *, * ) 'Press Enter to continue 2', thSat(i,j,k)
+                    !read( *, * )
+                    
+                    if(qc0(i,j,1).lt.0.0)then
+                       print *,'  calling stopcm1 (444) '
+                       call stopcm1
+                    endif
+                    
+                    !if(i.eq.1.and.j.eq.1.and.dowr) write(outfile,*) k,n,t0(i,j,k),fliq,fice
+                    
+                 enddo  ! enddo for k loop
+                 
+              enddo  ! enddo for i loop
+              
+           enddo  ! enddo for j loop
+           
+           !-----------------------------------------------------------------------
+           ! END Recalculate critically saturated background consistent with cm1
+           !-----------------------------------------------------------------------
+           
+        ENDIF
+        
+!-----------------------------------------------------------------------
 !     iinit = 9999 (RPW)
 !     Used for trivial initialization
 !     
@@ -432,6 +612,242 @@
        call bcu(ua)
        call bcw(wa,1)
 
+!-----------------------------------------------------------------------
+!     iinit = 1000 (RPW)
+!     Cloud over clear total internal reflection
+!     
+    ELSEIF(iinit.eq.1000)THEN
+       
+       !PertMag = 0.01; ! Wave dynamics magnitude (0 turns off)
+       !PertMag = 0.1; ! Wave dynamics magnitude (0 turns off)
+       !PertMag = 0.1/2; ! Wave dynamics magnitude (0 turns off)
+       !PertMag = 0.0; ! Wave dynamics magnitude (0 turns off)
+       PertMag = MBM_epsW
+
+       H = MBM_HScale 
+       Lscl = MBM_LScale
+       UScale = MBM_UScale 
+       ns = MBM_ns
+       !T0 = 273.15+5
+       T0 = MBM_T0
+       !P0 = 1e5
+       P0 = MBM_P0
+       H0 = rd*T0/g
+       !nbs = (ns/g)*(H0*cp/rd)
+       nbs = (ns/g**2)*(cp*T0)
+       !om = sqrt(nbs/((H/L)**2 + 1))
+       !om = 0.564601401884447 ! Omega choosen for this problem
+       !om = 0.519951656449535
+       !om = 0.487993922922780
+       !om = 0.504635287126706 (alpha = 1/2)
+       om = MBM_omega
+       epsln = (H/H0)*(rd/cp)
+       epslnl = (H/H0)*(rv*T0/xlv)
+       sig = H/Lscl
+       Lambda = (xlv/rv/T0)**2*(rd/cp)*(611.2*EXP(17.67*(T0-273.15)/(T0-29.65)))/p0
+       !alpha = 1.0
+       alpha = MBM_alpha
+       tau = sqrt(Lscl**2*cp*T0/g**2/H**2)
+       muScl = UScale*tau/Lscl
+       !alpha = 0.0
+       zB = MBM_zB
+       zT = pi
+       BuC = Lambda
+       LiqC = 1/(1+Lambda)
+       kwv = 1
+       
+       mClear = sqrt((kwv/om)**2*(nbs - om**2*sig**2))
+       mCloud = sqrt(-(kwv/om)**2*(nbs - om**2*sig**2 &
+            - BuC*LiqC*(1 - epslnl/epsln - alpha*muScl)))
+       !mCloud = sqrt(-(kwv/om)**2*(nbs - om**2*sig**2 &
+       !     - BuC*LiqC*(1 - epslnl/epsln)))
+       !mCloud = sqrt(-(kwv/om)**2*(- om**2*sig**2 &
+       !     + 0.6170))
+
+       !write( *, * ) 'Press Enter to continue', mCloud, mClear, (kwv/om)**2*(nbs - om**2*sig**2)
+       !read( *, * )
+
+       CmplxPhaseShift = CMPLX(mClear*tanh(mCloud*(-zT)), -mCloud)
+       
+       Phi = atan2(aimag(CmplxPhaseShift),real(CmplxPhaseShift))
+       mu = abs(CmplxPhaseShift)
+
+       write( *, * ) ' mCloud=', mCloud, ' mClear=', mClear, ' lambda=', lambda, &
+            ' omega=',om, ' sigma=', sig, ' z_B=', zB, ' phi=', phi, ' mu=', mu, &
+            ' H=', H, ' L=', Lscl, ' ns=', ns, ' nbs=', nbs, ' T0=', T0, &
+            'g =', g, 'cpd=', cp, ' muScl=', muScl
+       !read( *, * )
+
+       !write( *, * ) 'Press Enter to continue', size(xh), size(xf), nk, ni
+       !read( *, * )
+
+       ! Scalar fields loop
+       do k=1,nk+1
+          do j=1,nj+1
+             do i=1,ni+1
+                
+                !Ttmp = 1.0/nbs - (1.0-nbs)*exp(ns/g*zh(i,j,k))/nbs
+                !Ttmp = pi0(i,j,k)*th0(i,j,k)/288
+                !Gtmp = 1-nbs*Ttmp
+                
+                !Tbar = thSat(i,j,k)*piSat(i,j,k)/T0
+                !rbar = qvSat(i,j,k)/rslf(P0,T0)
+                !Gambar = 1-nbs*Tbar
+                Gambar = 1-nbs
+                !rbar_z = -Gambar/Tbar**2 + (epslnl/epsln)*(1/Tbar)
+                !rbar_z = -Gambar + (epslnl/epsln)
+                rbar_z = -Gambar + (epslnl/epsln) + alpha*muScl
+
+                ! Map dimensional x,z to non-dimensional x,z
+                zp = zh(i,j,k)/H + zb
+                xp = xh(i)/Lscl
+                zpf = zf(i,j,k)/H + zb
+                xpf = xf(i)/Lscl
+                
+                ! Define clear/cloud prime solutions
+                psiCloud = PertMag*(mClear/mu) &
+                     *tanh(mCloud*(-zT)) &
+                     *(sinh(mCloud*(zp-zT))/sinh(mCloud*(-zT))) &
+                     *cos(kwv*xp)
+                psiClear = PertMag*cos(mClear*(zp) + Phi) &
+                     *cos(kwv*xp)
+                
+                psiCloud_z = PertMag*(mClear*mCloud/mu) &
+                     *tanh(mCloud*(-zT)) &
+                     *(cosh(mCloud*(zp-zT))/sinh(mCloud*(-zT))) &
+                     *cos(kwv*xpf)
+                psiClear_z = -PertMag*mClear*sin(mClear*(zp) + Phi) &
+                     *cos(kwv*xpf);
+                
+                thetaCloud = (nbs*kwv/om)*psiCloud
+                thetaClear = (nbs*kwv/om)*psiClear
+                rTback = alpha*zp
+                !write( *, * ) 'Press Enter to continue', nbs, (epslnl/epsln), rbar_z
+                !read( *, * )
+                rtCloud = rbar_z*(kwv/om)*psiCloud
+                rtClear = rbar_z*(kwv/om)*psiClear
+                uCloud = -psiCloud_z
+                uClear = -psiClear_z
+                wCloud = -kwv*PertMag*(mClear/mu) &
+                     *tanh(mCloud*(-zT)) &
+                     *(sinh(mCloud*(zpf-zT))/sinh(mCloud*(-zT))) &
+                     *sin(kwv*xp);
+                wClear = -kwv*PertMag*cos(mClear*(zpf) + Phi) &
+                     *sin(kwv*xp);
+
+                ScrpL = LiqC*(-thetaCloud + rTback + rtCloud)
+
+                if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                   
+                   rlCloud = ScrpL
+                   !rlCloud = LiqC*(-thetaCloud + rTback + rtCloud)
+                   !rlCloud = LiqC*(-thetaCloud + rtCloud)
+                   !rlCloud = LiqC*(-thetaCloud + qv0(i,j,k)/qvSat(i,j,k) + qc0(i,j,k)/qvSat(i,j,k) - qvSat(i,j,k)/rslf(P0,T0) + rtCloud)
+                   !rlCloud = LiqC*(-thetaCloud + (qv0(i,j,k)-qvSat(i,j,k))/qvSat(i,j,k) + qc0(i,j,k)/qvSat(i,j,k) + rtCloud)
+
+                else
+                   
+                   rlCloud = 0
+                   
+                endif
+                
+                if(rlCloud.le.0)then
+                
+                   up = uClear
+                   wp = wClear
+                   thp = thetaClear
+                   rtp = rTback + rtClear
+                   rlp = 0
+
+                else
+                   
+                   up = uCloud
+                   wp = wCloud
+                   thp = thetaCloud
+                   rtp = rTback + rtCloud
+                   !rlp = 1/(Lambda + 1)*(-thp + rTp)
+                   rlp = rlCloud
+
+                endif
+
+                ua(i,j,k) = UScale*up
+                wa(i,j,k) = UScale*(H/Lscl)*wp
+                !ua(i,j,k) = up
+                !wa(i,j,k) = wp
+                !write( *, * ) 'Press Enter to continue', thp
+                !read( *, * )
+                
+                !rlp = Ttmp/(Lambda*qv0(i,j,k) + Ttmp**2)*(-thp + Ttmp*rTp)
+                !rlp = Tbar/(Lambda*rbar + Tbar**2)*(-thp + Tbar*rTp)
+                !rlp = Tbar/(Lambda*rbar + Tbar**2)*(-thp + Tbar*rTp)
+                !rvp = rTp - rlp
+                !rvTilde = (xlv/rv/T0)*(UScale/sqrt(cp*T0))*rvp 
+                
+                rlTilde = (xlv/rv/T0)*(UScale/sqrt(cp*T0))*rlp
+                rTTilde = (xlv/rv/T0)*(UScale/sqrt(cp*T0))*rtp
+                !rvTilde = rTTilde - rlTilde
+                
+                if(rlCloud.le.0)then
+                   
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rTTilde
+                   qa(i,j,k,nqv) = qvSat(i,j,k)*(1 + rTTilde)
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + rtp
+                   !qa(i,j,k,nqc) = qc0(i,j,k)
+                   qa(i,j,k,nqc) = 0
+
+                else
+
+                   !qa(i,j,k,nqc) = qvSat(i,j,k)*(1 + rlTilde)
+                   !qa(i,j,k,nqc) =  rlTilde
+                   qa(i,j,k,nqc) = qvSat(i,j,k)*(rlTilde)
+                   qa(i,j,k,nqv) = qvSat(i,j,k)*(1 + rTTilde) - qa(i,j,k,nqc)
+
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rvTilde
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + rtp
+                   !qa(i,j,k,nqc) = qc0(i,j,k) + qvSat(i,j,k)*rlTilde
+                   
+                endif
+
+                that = tSat(i,j,k)*(UScale/sqrt(cp*T0))*(thp + Lambda*rlp);
+                tback = pi0(i,j,k)*th0(i,j,k)
+                !tTot = tback + that
+                tTot = tSat(i,j,k) + that
+                thlHat = thSat(i,j,k)*UScale/(sqrt(cp*T0))*thp
+                thl0 = th0(i,j,k)*exp(-xlv/cp*(qc0(i,j,k)/tback))
+                thlTot = thSat(i,j,k) + thlHat
+                pow1 = xlv/cp*(qa(i,j,k,nqc)/tTot)
+                pow2 = xlv/cp*(qc0(i,j,k)/tback)
+                tha(i,j,k) = thltot*exp(xlv/cp*(qa(i,j,k,nqc)/tTot)) - th0(i,j,k) !This one
+
+                !write( *, * ) 'Press Enter to continue', th0(i,j,k), thlhat, qa(i,j,k,nqc), thSat(i,j,k)
+                !read( *, * )
+
+                !tha(i,j,k) = thp;
+
+                !tha(i,j,k) = thSat(i,j,k)*exp((pow1+pow2)/2)*2*sinh((pow1-pow2)/2) &
+                !     + thlHat*exp(pow1)
+                !thTot = thlTot*exp(pow1)
+                !tha(i,j,k) = thTot - th0(i,j,k)
+
+                !write( *, * ) 'Press Enter to continue', UScale, H/Lscl*UScale, UScale/(sqrt(cp*T0)), (xlv/rv/T0)*(UScale/sqrt(cp*T0)), H, Lscl
+                !read( *, * )
+
+             enddo
+          enddo
+       enddo
+
+       do k=1,nk+1
+          do j=1,nj+1
+             do i=1,ni+1
+                zp = zh(i,j,k)/H + zb
+                !ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - 10*PertMag*UScale*zp)
+                ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - zp)
+             enddo
+          enddo
+       enddo
+
+       call bcu(ua)
+       call bcw(wa,1)       
 
 !-----------------------------------------------------------------------
 !  iinit = 1
