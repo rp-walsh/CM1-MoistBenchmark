@@ -350,6 +350,7 @@
       print *,'  MBM_pisfc = ', MBM_pisfc
       print *,'  MBM_epsW = ', MBM_epsW
       print *,'  MBM_omega = ', MBM_omega
+      print *,'  MBM_omega = ', MBM_kwv
       print *,'  P00 = ', P00
 
       p00 = MBM_P0

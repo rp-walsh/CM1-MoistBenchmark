@@ -654,7 +654,7 @@
        zT = pi
        BuC = Lambda
        LiqC = 1/(1+Lambda)
-       kwv = 1
+       kwv = MBM_kwv
        
        mClear = sqrt((kwv/om)**2*(nbs - om**2*sig**2))
        mCloud = sqrt(-(kwv/om)**2*(nbs - om**2*sig**2 &
@@ -737,7 +737,8 @@
 
                 ScrpL = LiqC*(-thetaCloud + rTback + rtCloud)
 
-                if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                !if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                if(zp.ge.-.5.and.Scrpl.gt.0)then
                    
                    rlCloud = ScrpL
                    !rlCloud = LiqC*(-thetaCloud + rTback + rtCloud)
@@ -836,15 +837,239 @@
           enddo
        enddo
 
+!       do k=1,nk+1
+!          do j=1,nj+1
+!             do i=1,ni+1
+!                zp = zh(i,j,k)/H + zb
+!                !ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - 10*PertMag*UScale*zp)
+!                ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - zp)
+!             enddo
+!          enddo
+!       enddo
+
+       call bcu(ua)
+       call bcw(wa,1)       
+
+!-----------------------------------------------------------------------
+!     iinit = 1001 (RPW)
+!     Cloud over clear ExpPeriodicV2
+!     
+    ELSEIF(iinit.eq.1001)THEN
+       
+       PertMag = MBM_epsW
+
+       H = MBM_HScale 
+       Lscl = MBM_LScale
+       UScale = MBM_UScale 
+       ns = MBM_ns
+       T0 = MBM_T0
+       P0 = MBM_P0
+       H0 = rd*T0/g
+       nbs = (ns/g**2)*(cp*T0)
+       om = MBM_omega
+       epsln = (H/H0)*(rd/cp)
+       epslnl = (H/H0)*(rv*T0/xlv)
+       sig = H/Lscl
+       Lambda = (xlv/rv/T0)**2*(rd/cp)*(611.2*EXP(17.67*(T0-273.15)/(T0-29.65)))/p0
+       alpha = MBM_alpha
+       tau = sqrt(Lscl**2*cp*T0/g**2/H**2)
+       muScl = UScale*tau/Lscl
+       zB = MBM_zB
+       !zT = pi
+       BuC = Lambda
+       LiqC = 1/(1+Lambda)
+       kwv = MBM_kwv
+       
+       mClear = sqrt((kwv/om)**2*(nbs - om**2*sig**2))
+       mCloud = sqrt(-(kwv/om)**2*(nbs - om**2*sig**2 &
+            - BuC*LiqC*(1 - epslnl/epsln - alpha*muScl)))
+       !mCloud = sqrt(-(kwv/om)**2*(nbs - om**2*sig**2 &
+       !     - BuC*LiqC*(1 - epslnl/epsln)))
+       !mCloud = sqrt(-(kwv/om)**2*(- om**2*sig**2 &
+       !     + 0.6170))
+
+       !write( *, * ) 'Press Enter to continue', mCloud, mClear
+       !read( *, * )
+
+       !CmplxPhaseShift = CMPLX(mClear*tanh(mCloud*(-zT)), -mCloud)
+       
+       !Phi = atan2(aimag(CmplxPhaseShift),real(CmplxPhaseShift))
+       !mu = abs(CmplxPhaseShift)
+
+       zT = atanh(mCloud/mClear*tan(mClear*zB))/mCloud
+
+       write( *, * ) ' mCloud=', mCloud, ' mClear=', mClear, ' lambda=', lambda, &
+            ' omega=',om, ' sigma=', sig, ' z_B=', zB, ' z_T=', zT,  &
+            ' H=', H, ' L=', Lscl, ' ns=', ns, ' nbs=', nbs, ' T0=', T0, &
+            'g =', g, 'cpd=', cp, ' muScl=', muScl
+       !read( *, * )
+
+       !write( *, * ) 'Press Enter to continue', size(xh), size(xf), nk, ni
+       !read( *, * )
+
+       ! Scalar fields loop
        do k=1,nk+1
           do j=1,nj+1
              do i=1,ni+1
+                
+                !Ttmp = 1.0/nbs - (1.0-nbs)*exp(ns/g*zh(i,j,k))/nbs
+                !Ttmp = pi0(i,j,k)*th0(i,j,k)/288
+                !Gtmp = 1-nbs*Ttmp
+                
+                !Tbar = thSat(i,j,k)*piSat(i,j,k)/T0
+                !rbar = qvSat(i,j,k)/rslf(P0,T0)
+                !Gambar = 1-nbs*Tbar
+                Gambar = 1-nbs
+                !rbar_z = -Gambar/Tbar**2 + (epslnl/epsln)*(1/Tbar)
+                !rbar_z = -Gambar + (epslnl/epsln)
+                rbar_z = -Gambar + (epslnl/epsln) + alpha*muScl
+
+                PertMag = -MBM_epsW*alpha*(om/kwv)/(-rbar_z + nbs)
+
+                ! Map dimensional x,z to non-dimensional x,z
                 zp = zh(i,j,k)/H + zb
-                !ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - 10*PertMag*UScale*zp)
-                ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - zp)
+                xp = xh(i)/Lscl
+                zpf = zf(i,j,k)/H + zb
+                xpf = xf(i)/Lscl
+                
+                ! Define clear/cloud prime solutions
+                psiCloud = PertMag*(sinh(mCloud*(zp-zT))/sinh(mCloud*zT)) &
+                     *cos(kwv*xp)
+                psiClear = PertMag*(sin(mClear*(zp-zB))/sin(mClear*zB)) &
+                     *cos(kwv*xp)
+                
+                psiCloud_z = PertMag*mCloud*(cosh(mCloud*(zp-zT))/sinh(mCloud*zT)) &
+                     *cos(kwv*xpf)
+                psiClear_z = PertMag*mClear*(cos(mClear*(zp-zB))/sin(mClear*zB)) &
+                     *cos(kwv*xpf);
+                
+                thetaCloud = (nbs*kwv/om)*psiCloud
+                thetaClear = (nbs*kwv/om)*psiClear
+                rTback = alpha*zp
+                !write( *, * ) 'Press Enter to continue', nbs, (epslnl/epsln), rbar_z
+                !read( *, * )
+                rtCloud = rbar_z*(kwv/om)*psiCloud
+                rtClear = rbar_z*(kwv/om)*psiClear
+                uCloud = -psiCloud_z
+                uClear = -psiClear_z
+                wCloud = -kwv*PertMag*(sinh(mCloud*(zp-zT))/sinh(mCloud*zT)) &
+                     *sin(kwv*xp);
+                wClear = -kwv*PertMag*(sin(mClear*(zp-zB))/sin(mClear*zB)) &
+                     *sin(kwv*xp);
+
+                ScrpL = LiqC*(-thetaCloud + rTback + rtCloud)
+
+                !if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                if(zp.ge.-.5.and.Scrpl.gt.0)then
+                   
+                   rlCloud = ScrpL
+                   !rlCloud = LiqC*(-thetaCloud + rTback + rtCloud)
+                   !rlCloud = LiqC*(-thetaCloud + rtCloud)
+                   !rlCloud = LiqC*(-thetaCloud + qv0(i,j,k)/qvSat(i,j,k) + qc0(i,j,k)/qvSat(i,j,k) - qvSat(i,j,k)/rslf(P0,T0) + rtCloud)
+                   !rlCloud = LiqC*(-thetaCloud + (qv0(i,j,k)-qvSat(i,j,k))/qvSat(i,j,k) + qc0(i,j,k)/qvSat(i,j,k) + rtCloud)
+
+                else
+                   
+                   rlCloud = 0
+                   
+                endif
+                
+                if(rlCloud.le.0)then
+                
+                   up = uClear
+                   !up = rlCloud
+                   wp = wClear
+                   thp = thetaClear
+                   rtp = rTback + rtClear
+                   rlp = 0
+
+                else
+                   
+                   up = uCloud
+                   !up = rlCloud
+                   wp = wCloud
+                   thp = thetaCloud
+                   rtp = rTback + rtCloud
+                   !rlp = 1/(Lambda + 1)*(-thp + rTp)
+                   rlp = rlCloud
+
+                endif
+
+                ua(i,j,k) = UScale*up
+                wa(i,j,k) = UScale*(H/Lscl)*wp
+                !ua(i,j,k) = up
+                !wa(i,j,k) = wp
+                !write( *, * ) 'Press Enter to continue', thp
+                !read( *, * )
+                
+                !rlp = Ttmp/(Lambda*qv0(i,j,k) + Ttmp**2)*(-thp + Ttmp*rTp)
+                !rlp = Tbar/(Lambda*rbar + Tbar**2)*(-thp + Tbar*rTp)
+                !rlp = Tbar/(Lambda*rbar + Tbar**2)*(-thp + Tbar*rTp)
+                !rvp = rTp - rlp
+                !rvTilde = (xlv/rv/T0)*(UScale/sqrt(cp*T0))*rvp 
+                
+                rlTilde = (xlv/rv/T0)*(UScale/sqrt(cp*T0))*rlp
+                rTTilde = (xlv/rv/T0)*(UScale/sqrt(cp*T0))*rtp
+                !rvTilde = rTTilde - rlTilde
+                
+                if(rlCloud.le.0)then
+                   
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rTTilde
+                   qa(i,j,k,nqv) = qvSat(i,j,k)*(1 + rTTilde)
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + rtp
+                   !qa(i,j,k,nqc) = qc0(i,j,k)
+                   qa(i,j,k,nqc) = 0
+
+                else
+
+                   !qa(i,j,k,nqc) = qvSat(i,j,k)*(1 + rlTilde)
+                   !qa(i,j,k,nqc) =  rlTilde
+                   qa(i,j,k,nqc) = qvSat(i,j,k)*(rlTilde)
+                   qa(i,j,k,nqv) = qvSat(i,j,k)*(1 + rTTilde) - qa(i,j,k,nqc)
+
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rvTilde
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + rtp
+                   !qa(i,j,k,nqc) = qc0(i,j,k) + qvSat(i,j,k)*rlTilde
+                   
+                endif
+
+                that = tSat(i,j,k)*(UScale/sqrt(cp*T0))*(thp + Lambda*rlp);
+                tback = pi0(i,j,k)*th0(i,j,k)
+                !tTot = tback + that
+                tTot = tSat(i,j,k) + that
+                thlHat = thSat(i,j,k)*UScale/(sqrt(cp*T0))*thp
+                thl0 = th0(i,j,k)*exp(-xlv/cp*(qc0(i,j,k)/tback))
+                thlTot = thSat(i,j,k) + thlHat
+                pow1 = xlv/cp*(qa(i,j,k,nqc)/tTot)
+                pow2 = xlv/cp*(qc0(i,j,k)/tback)
+                tha(i,j,k) = thltot*exp(xlv/cp*(qa(i,j,k,nqc)/tTot)) - th0(i,j,k) !This one
+
+                !write( *, * ) 'Press Enter to continue', th0(i,j,k), thlhat, qa(i,j,k,nqc), thSat(i,j,k)
+                !read( *, * )
+
+                !tha(i,j,k) = thp;
+
+                !tha(i,j,k) = thSat(i,j,k)*exp((pow1+pow2)/2)*2*sinh((pow1-pow2)/2) &
+                !     + thlHat*exp(pow1)
+                !thTot = thlTot*exp(pow1)
+                !tha(i,j,k) = thTot - th0(i,j,k)
+
+                !write( *, * ) 'Press Enter to continue', UScale, H/Lscl*UScale, UScale/(sqrt(cp*T0)), (xlv/rv/T0)*(UScale/sqrt(cp*T0)), H, Lscl
+                !read( *, * )
+
              enddo
           enddo
        enddo
+
+!       do k=1,nk+1
+!          do j=1,nj+1
+!             do i=1,ni+1
+!                zp = zh(i,j,k)/H + zb
+!                !ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - 10*PertMag*UScale*zp)
+!                ua(i,j,k) = ua(i,j,k) - 0.8900*(1 - zp)
+!             enddo
+!          enddo
+!       enddo
 
        call bcu(ua)
        call bcw(wa,1)       
