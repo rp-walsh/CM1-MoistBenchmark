@@ -7,15 +7,15 @@
     real :: g,rd,rv,cp,cpinv,cv,cpv,cvv,rcp,                                 &
             cpdcv,rovcp,rddcp,rddcv,rddrv,cvdrd,cpdrd,eps,reps,repsm1,       &
             cpt,cvt,pnum,xlv,lathv,xls,lvdcp,condc,cpl,cpi,lv1,lv2,ls1,ls2,  &
-            rhow,c_e1,c_e2,c_s,rcs,earth_radius,govtwo,p00,rp00
+            rhow,c_e1,c_e2,c_s,rcs,earth_radius,govtwo
 
       !----------------
 
       real, parameter ::  pi     = 3.1415926535897932384626433
       real, parameter ::  th0r   = 300.0
       real, parameter ::  to     = 273.15
-      !real, parameter ::  p00    = 1.0e5
-      !real, parameter ::  rp00   = 1.0/p00
+      real, parameter ::  p00    = 1.0e5
+      real, parameter ::  rp00   = 1.0/p00
       real, parameter ::  piddeg = pi/180.0
       real, parameter ::  degdpi = 180.0/pi
       real, parameter ::  clwsat = 1.e-6

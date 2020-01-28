@@ -350,13 +350,13 @@
       print *,'  MBM_pisfc = ', MBM_pisfc
       print *,'  MBM_epsW = ', MBM_epsW
       print *,'  MBM_omega = ', MBM_omega
-      print *,'  MBM_omega = ', MBM_kwv
+      print *,'  MBM_kwv = ', MBM_kwv
       print *,'  P00 = ', P00
 
-      p00 = MBM_P0
-      rp00 = 1/p00
+      !p00 = MBM_P0
+      !rp00 = 1/p00
 
-      print *,'after setting  P00 = ', P00
+      print *,'after not setting  P00 = ', P00
 
 
       IF( procfiles )THEN
