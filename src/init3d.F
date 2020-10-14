@@ -182,6 +182,9 @@
       real :: thl0, thlHat, thlTot, thp, tTot, uClear, uCloud, up, UScale
       real :: wClear, wCloud, wp, xp, xpf, zB, zp, zpf
       complex :: CmplxPhaseShift
+      real :: z0, Ht, hl, thbar_z, estar0, rstar0, nms, epsW
+      real :: psiCloudu, psiCloudw, rTbackw, ScrpLu, ScrpLw
+      real :: zStarxf, zStarxh, rlpert
 !------------------------------------------------------------------
 
 !--------------------------
@@ -433,7 +436,7 @@
 !     Used for multiple initializations (RPW)
 !     
 
-        IF(iinit.eq.1000.or.iinit.eq.1001.or.iinit.eq.1011.or.iinit.eq.1002)THEN
+        IF(iinit.eq.1000.or.iinit.eq.1001.or.iinit.eq.1011.or.iinit.eq.1002.or.iinit.eq.1003.or.iinit.eq.1004)THEN
            
            !-----------------------------------------------------------------------
            ! The leading order cloud layer for the TIR benchmark has been placed in
@@ -1297,6 +1300,593 @@
 !             enddo
 !          enddo
 !       enddo
+
+       call bcu(ua)
+       call bcw(wa,1)       
+
+!-----------------------------------------------------------------------
+!     iinit = 1002 (RPW)
+!     Cloud over clear DimExpPeriodic
+!     
+    ELSEIF(iinit.eq.1002)THEN
+       
+       Ht = MBM_Ht
+       Hl = MBM_hl
+       mClear = MBM_mClear
+       mCloud = MBM_mCloud
+       om = MBM_omega
+       ns = MBM_ns
+       T0 = MBM_T0
+       P0 = MBM_P0
+       kwv = MBM_kwv
+       uScale = MBM_UScale
+       alpha = MBM_alpha
+       epsW = MBM_epsW*hl ! dimensional epsW from epsW'
+
+       estar0 = 611.2*EXP(17.67*(T0-273.15)/(T0-29.65))
+       rstar0 = (Rd/Rv)*estar0/(P0 - estar0)
+       Gambar = (g/cp) - T0*(ns/g) ! fully dimensional
+       rbar_z = -xlv*Gambar/Rv/T0**2 + g/Rd/T0
+       thbar_z = ns/g
+       Lambda = (xlv**2/Rv/cp)*rstar0/T0**2
+       nms = g*(thbar_z/(1+Lambda) + &
+            Lambda/(1+Lambda)*T0*Rv/xlv*rbar_z)
+       beta = (uScale/sqrt(cp*T0))*(xlv/Rv/T0)*(alpha/hl)
+       PertMag = (epsW*beta*om/kwv)/(rbar_z - (xlv/Rv/T0)*thbar_z)
+       !PertMag=1
+
+       write( *, * ) 'Cloud over clear DimExpPeriodic parameters:'
+       write( *, * ) 'H=',Ht,', h=',hl,', mCloud=',mCloud,', mClear=',mClear, &
+            ', omega=',om,', ns=',ns,', T0=',T0,', uScale=',uScale, &
+            ', Lambda=',Lambda,', nms=',nms,', rstar0', rstar0,', estar0=',estar0 
+       !read( *, * )
+
+       ! Scalar fields loop
+       do k=1,nk+1
+          do j=1,nj+1
+             do i=1,ni+1         
+                       
+                ! Define clear/cloud dimensional solutions
+                psiCloud = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+                psiClear = PertMag* &
+                     (sin(mClear*zh(i,j,k))/sin(mClear*hl))* &
+                     cos(kwv*xh(i))
+
+                ! Define psi on u and w meshes for initialization
+                psiCloudu = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                psiCloudw = PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+
+                psiCloud_z = PertMag* &
+                     mCloud*(cosh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                !psiCloud_z = cos(kwv*xf(i))
+                psiClear_z = PertMag* &
+                     mClear*(cos(mClear*zh(i,j,k))/sin(mClear*hl))* &
+                     cos(kwv*xf(i))
+                !psiClear_z = cos(kwv*xf(i))
+
+                thetaCloud = (ns/g)*(kwv/om)*psiCloud
+                thetaClear = (ns/g)*(kwv/om)*psiClear
+                rTback = beta*(zh(i,j,k) - hl)
+                rtCloud = rbar_z*(kwv/om)*psiCloud
+                rtClear = rbar_z*(kwv/om)*psiClear
+                uCloud = -psiCloud_z
+                uClear = -psiClear_z
+                wCloud = -kwv*PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     sin(kwv*xh(i));
+                wClear = -kwv*PertMag* &
+                     (sin(mClear*zf(i,j,k))/sin(mClear*hl))* &
+                     sin(kwv*xh(i));
+
+                ! Define psi on u and w meshes for initialization
+                psiCloudu = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                psiCloudw = PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+                rTbackw = beta*(zf(i,j,k) - hl)
+
+                ScrpL = 1/(1+Lambda)*(-(xlv/Rv/T0)*thetaCloud + rTback + rtCloud)
+                ScrpLu = 1/(1+Lambda)*(-(xlv/Rv/T0)*(ns/g)*(kwv/om)*psiCloudu + &
+                     rTback + rbar_z*(kwv/om)*psiCloudu)
+                ScrpLw = 1/(1+Lambda)*(-(xlv/Rv/T0)*(ns/g)*(kwv/om)*psiCloudw + &
+                     rTbackw + rbar_z*(kwv/om)*psiCloudw)
+
+                !if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                !if((zh(i,j,k)-hl).ge.-3*epsW.and.Scrpl.gt.0)then
+                if(Scrpl.gt.0)then
+                   
+                   rlCloud = ScrpL
+                   
+                else
+                   
+                   rlCloud = 0
+                   
+                endif
+
+                if(Scrplu.gt.0)then
+
+                   up = uCloud
+
+                else
+
+                   up = uClear
+
+                endif
+
+                if(Scrplw.gt.0)then
+
+                   wp = wCloud
+
+                else
+
+                   wp = wClear
+
+                endif
+
+                if(rlCloud.le.0)then
+                
+                   !up = uClear
+                   !up = rlCloud
+                   !wp = wClear
+                   thp = thetaClear
+                   rtp = rTback + rtClear
+                   rlp = 0
+
+                else
+                   
+                   !up = uCloud
+                   !up = rlCloud
+                   !wp = wCloud
+                   thp = thetaCloud
+                   rtp = rTback + rtCloud
+                   !rlp = 1/(Lambda + 1)*(-thp + rTp)
+                   rlp = rlCloud
+
+                endif
+
+                ua(i,j,k) = up
+                !ua(i,j,k) = cos(kwv*xf(i))
+                !write(*,*) 'i=',i, ', xf(i)=', xf(i),', u(xf)=',cos(kwv*xf(i)), &
+                !     ', kwv*xf(i)',kwv*xf(i),', kwv=',kwv
+                !read(*,*)
+                wa(i,j,k) = wp
+                                
+                rlTilde = rlp
+                rTTilde = rtp
+                !rvTilde = rTTilde - rlTilde
+                
+                if(rlCloud.le.0)then
+                   
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rTTilde
+                   qa(i,j,k,nqv) = qvSat(i,j,k)*(1 + rTTilde)
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + rtp
+                   !qa(i,j,k,nqc) = qc0(i,j,k)
+                   qa(i,j,k,nqc) = 0
+
+                else
+
+                   !qa(i,j,k,nqc) = qvSat(i,j,k)*(1 + rlTilde)
+                   !qa(i,j,k,nqc) =  rlTilde
+                   qa(i,j,k,nqc) = qvSat(i,j,k)*(rlTilde)
+                   qa(i,j,k,nqv) = qvSat(i,j,k)*(1 + rTTilde) - qa(i,j,k,nqc)
+
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rvTilde
+                   !qa(i,j,k,nqv) = qv0(i,j,k) + rtp
+                   !qa(i,j,k,nqc) = qc0(i,j,k) + qvSat(i,j,k)*rlTilde
+                   
+                endif
+
+                ! HAVE YET TO CONSIDER IF THETA IS CORRECT!!!!!!!
+
+                !that = tSat(i,j,k)*(thp + Lambda*T0*(Rv/xlv)*rlp);
+                !tback = pi0(i,j,k)*th0(i,j,k)
+                !!tTot = tback + that
+                !tTot = tSat(i,j,k) + that
+                !thlHat = thSat(i,j,k)*thp
+                !thl0 = th0(i,j,k)*exp(-xlv/cp*(qc0(i,j,k)/tback))
+                !thlTot = thSat(i,j,k) + thlHat
+                !pow1 = xlv/cp*(qa(i,j,k,nqc)/tTot)
+                !pow2 = xlv/cp*(qc0(i,j,k)/tback)
+                !tha(i,j,k) = thltot*exp(xlv/cp*(qa(i,j,k,nqc)/tTot)) - th0(i,j,k) !This one
+
+                !! Usual case prior to Oct5th 2020
+                !tTot = tSat(i,j,k)*(1 + (thp + Lambda*T0*(Rv/xlv)*rlp))
+                !tback = pi0(i,j,k)*th0(i,j,k)
+                !!!!! r_l=qa(i,j,k,nqc); (r_l)_L = qc0(i,j,k) ! This was commented out prior to Oct5th 2020
+                !tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                !     exp(xlv/cp*(qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback)) - 1)
+                
+                !! New Test post Oct 5th 2020
+                tback = pi0(i,j,k)*th0(i,j,k)
+                !tTot = tSat(i,j,k)*(1 + (thp + Lambda*T0*(Rv/xlv)*rlp))
+                tTot = tback + tSat(i,j,k)*(thp + Lambda*T0*(Rv/xlv)*rlp)
+                ! r_l=qa(i,j,k,nqc); (r_l)_L = qc0(i,j,k) ! This was commented out prior to Oct5th 2020
+                !tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                !     exp(xlv/cp*(qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback)) - 1)
+
+                tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                     exp(xlv/cp*(qa(i,j,k,nqc)/tTot))/exp(xlv/cp*(qc0(i,j,k)/tback)) - 1)
+
+                !tha(i,j,k) = qa(i,j,k,nqc) - qc0(i,j,k);
+             enddo
+          enddo
+       enddo
+
+       call bcu(ua)
+       call bcw(wa,1)       
+
+!-----------------------------------------------------------------------
+!     iinit = 1003 (RPW)
+!     Cloud over clear DimExpPeriodic
+!     Fixing SMR issue in theta initialization. See 
+!     BenchmarkDesigns-Paper pg. 53 for details on problem
+!
+!     There is still the initialization issue in this set up. See pg. 55
+!     for details. zStar = z0 + epsW*cos(kx) where z0 in Boussinesq and
+!     cm1 differ slightly due to full physics.
+!
+    ELSEIF(iinit.eq.1003)THEN
+       
+       Ht = MBM_Ht
+       Hl = MBM_hl
+       mClear = MBM_mClear
+       mCloud = MBM_mCloud
+       om = MBM_omega
+       ns = MBM_ns
+       T0 = MBM_T0
+       P0 = MBM_P0
+       kwv = MBM_kwv
+       uScale = MBM_UScale
+       alpha = MBM_alpha
+       epsW = MBM_epsW*hl ! dimensional epsW from epsW'
+
+       estar0 = 611.2*EXP(17.67*(T0-273.15)/(T0-29.65))
+       rstar0 = (Rd/Rv)*estar0/(P0 - estar0)
+       Gambar = (g/cp) - T0*(ns/g) ! fully dimensional
+       rbar_z = -xlv*Gambar/Rv/T0**2 + g/Rd/T0
+       thbar_z = ns/g
+       Lambda = (xlv**2/Rv/cp)*rstar0/T0**2
+       nms = g*(thbar_z/(1+Lambda) + &
+            Lambda/(1+Lambda)*T0*Rv/xlv*rbar_z)
+       beta = (uScale/sqrt(cp*T0))*(xlv/Rv/T0)*(alpha/hl)
+       PertMag = (epsW*beta*om/kwv)/(rbar_z - (xlv/Rv/T0)*thbar_z)
+       !PertMag=1
+
+       write( *, * ) 'Cloud over clear DimExpPeriodic parameters:'
+       write( *, * ) 'H=',Ht,', h=',hl,', mCloud=',mCloud,', mClear=',mClear, &
+            ', omega=',om,', ns=',ns,', T0=',T0,', uScale=',uScale, &
+            ', Lambda=',Lambda,', nms=',nms,', rstar0', rstar0,', estar0=',estar0 
+       !read( *, * )
+
+       ! Scalar fields loop
+       do k=1,nk+1
+          do j=1,nj+1
+             do i=1,ni+1         
+                       
+                ! Define clear/cloud dimensional solutions
+                psiCloud = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+                psiClear = PertMag* &
+                     (sin(mClear*zh(i,j,k))/sin(mClear*hl))* &
+                     cos(kwv*xh(i))
+
+                ! Define psi on u and w meshes for initialization
+                psiCloudu = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                psiCloudw = PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+
+                psiCloud_z = PertMag* &
+                     mCloud*(cosh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                !psiCloud_z = cos(kwv*xf(i))
+                psiClear_z = PertMag* &
+                     mClear*(cos(mClear*zh(i,j,k))/sin(mClear*hl))* &
+                     cos(kwv*xf(i))
+                !psiClear_z = cos(kwv*xf(i))
+
+                thetaCloud = (ns/g)*(kwv/om)*psiCloud
+                thetaClear = (ns/g)*(kwv/om)*psiClear
+                rTback = beta*(zh(i,j,k) - hl)
+                rtCloud = rbar_z*(kwv/om)*psiCloud
+                rtClear = rbar_z*(kwv/om)*psiClear
+                uCloud = -psiCloud_z
+                uClear = -psiClear_z
+                wCloud = -kwv*PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     sin(kwv*xh(i));
+                wClear = -kwv*PertMag* &
+                     (sin(mClear*zf(i,j,k))/sin(mClear*hl))* &
+                     sin(kwv*xh(i));
+
+                ! Define zStar for interface location
+
+                zStarxf = hl + epsW*cos(kwv*xf(i))
+                zStarxh = hl + epsW*cos(kwv*xh(i))
+                
+
+                rlpert = 1/(1+Lambda)*(-(xlv/Rv/T0)*thetaCloud + rtCloud)
+
+                !if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                !if((zh(i,j,k)-hl).ge.-3*epsW.and.Scrpl.gt.0)then
+                if(zh(i,j,k).gt.zStarxf)then
+
+                   up = uCloud
+
+                else
+
+                   up = uClear
+
+                endif
+
+                if(zf(i,j,k).gt.zStarxh)then
+
+                   wp = wCloud
+
+                else
+
+                   wp = wClear
+
+                endif
+
+                if(zh(i,j,k).gt.zStarxh)then
+
+                   thp = thetaCloud
+                   rtp = rtCloud
+                   rlp = rlpert
+
+                else
+
+                   thp = thetaClear
+                   rtp = rtClear
+                   rlp = 0
+
+                endif
+
+                ua(i,j,k) = up
+                wa(i,j,k) = wp
+                                
+                rlTilde = rlp
+                rTTilde = rtp
+                !rvTilde = rTTilde - rlTilde
+
+                if(zh(i,j,k).gt.zStarxh)then
+
+                   qa(i,j,k,nqc) = qc0(i,j,k) + qvSat(i,j,k)*(rlpert)
+                   qa(i,j,k,nqv) = (qv0(i,j,k) + qc0(i,j,k) + &
+                        qvSat(i,j,k)*(rTTilde)) - qa(i,j,k,nqc)
+
+                else
+
+                   qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rTTilde
+                   !qa(i,j,k,nqc) = qc0(i,j,k)
+                   qa(i,j,k,nqc) = 0
+
+                endif
+
+                ! HAVE YET TO CONSIDER IF THETA IS CORRECT!!!!!!!
+
+                tback = pi0(i,j,k)*th0(i,j,k)
+
+                tTot = tback + tSat(i,j,k)*(thp + Lambda*T0*(Rv/xlv)*rlp)
+                ! r_l=qa(i,j,k,nqc); (r_l)_L = qc0(i,j,k) ! This was commented out prior to Oct5th 2020
+                !tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                !     exp(xlv/cp*(qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback)) - 1)
+
+                tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                     exp(xlv/cp*(qa(i,j,k,nqc)/tTot))/exp(xlv/cp*(qc0(i,j,k)/tback)) - 1)
+
+                !tha(i,j,k) = zStarxh
+
+                !tha(i,j,k) = rlpert
+                !tha(i,j,k) = qc0(i,j,k) - qc0(i,j,k)
+
+                !tha(i,j,k) = (exp((qa(i,j,k,nqc)/tTot))/exp((qc0(i,j,k)/tback)))**xlv/cp
+                !tha(i,j,k) = exp(qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback)**xlv/cp
+                !tha(i,j,k) = 1+thp
+                !tha(i,j,k) = qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback
+                !tha(i,j,k) = qa(i,j,k,nqc) - qc0(i,j,k);
+                !tha(i,j,k) = 0;
+             enddo
+          enddo
+       enddo
+
+       call bcu(ua)
+       call bcw(wa,1)       
+
+!-----------------------------------------------------------------------
+!     iinit = 1004 (RPW)
+!     Cloud over clear DimExpPeriodic
+!     Fixing SMR issue in theta initialization. See 
+!     BenchmarkDesigns-Paper pg. 53 for details on problem
+!
+!     There is still the initialization issue in this set up. See pg. 55
+!     for details. zStar = z0 + epsW*cos(kx) where z0 in Boussinesq and
+!     cm1 differ slightly due to full physics.
+!
+!     Quick and dirty fix to the above problem. This is an imperfect 
+!     initialization see pg. 56.
+!
+    ELSEIF(iinit.eq.1004)THEN
+       
+       Ht = MBM_Ht
+       Hl = MBM_hl
+       mClear = MBM_mClear
+       mCloud = MBM_mCloud
+       om = MBM_omega
+       ns = MBM_ns
+       T0 = MBM_T0
+       P0 = MBM_P0
+       kwv = MBM_kwv
+       uScale = MBM_UScale
+       alpha = MBM_alpha
+       epsW = MBM_epsW*hl ! dimensional epsW from epsW'
+
+       estar0 = 611.2*EXP(17.67*(T0-273.15)/(T0-29.65))
+       rstar0 = (Rd/Rv)*estar0/(P0 - estar0)
+       Gambar = (g/cp) - T0*(ns/g) ! fully dimensional
+       rbar_z = -xlv*Gambar/Rv/T0**2 + g/Rd/T0
+       thbar_z = ns/g
+       Lambda = (xlv**2/Rv/cp)*rstar0/T0**2
+       nms = g*(thbar_z/(1+Lambda) + &
+            Lambda/(1+Lambda)*T0*Rv/xlv*rbar_z)
+       beta = (uScale/sqrt(cp*T0))*(xlv/Rv/T0)*(alpha/hl)
+       PertMag = (epsW*beta*om/kwv)/(rbar_z - (xlv/Rv/T0)*thbar_z)
+       !PertMag=1
+
+       write( *, * ) 'Cloud over clear DimExpPeriodic parameters:'
+       write( *, * ) 'H=',Ht,', h=',hl,', mCloud=',mCloud,', mClear=',mClear, &
+            ', omega=',om,', ns=',ns,', T0=',T0,', uScale=',uScale, &
+            ', Lambda=',Lambda,', nms=',nms,', rstar0', rstar0,', estar0=',estar0 
+       !read( *, * )
+
+       ! Scalar fields loop
+       do k=1,nk+1
+          do j=1,nj+1
+             do i=1,ni+1         
+                       
+                ! Define clear/cloud dimensional solutions
+                psiCloud = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+                psiClear = PertMag* &
+                     (sin(mClear*zh(i,j,k))/sin(mClear*hl))* &
+                     cos(kwv*xh(i))
+
+                ! Define psi on u and w meshes for initialization
+                psiCloudu = PertMag* &
+                     (sinh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                psiCloudw = PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xh(i))
+
+                psiCloud_z = PertMag* &
+                     mCloud*(cosh(mCloud*(zh(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     cos(kwv*xf(i))
+                !psiCloud_z = cos(kwv*xf(i))
+                psiClear_z = PertMag* &
+                     mClear*(cos(mClear*zh(i,j,k))/sin(mClear*hl))* &
+                     cos(kwv*xf(i))
+                !psiClear_z = cos(kwv*xf(i))
+
+                thetaCloud = (ns/g)*(kwv/om)*psiCloud
+                thetaClear = (ns/g)*(kwv/om)*psiClear
+                rTback = beta*(zh(i,j,k) - hl)
+                rtCloud = rbar_z*(kwv/om)*psiCloud
+                rtClear = rbar_z*(kwv/om)*psiClear
+                uCloud = -psiCloud_z
+                uClear = -psiClear_z
+                wCloud = -kwv*PertMag* &
+                     (sinh(mCloud*(zf(i,j,k)-Ht))/sinh(mCloud*(hl-Ht)))* &
+                     sin(kwv*xh(i));
+                wClear = -kwv*PertMag* &
+                     (sin(mClear*zf(i,j,k))/sin(mClear*hl))* &
+                     sin(kwv*xh(i));
+
+                ! Define zStar for interface location
+
+                zStarxf = hl + epsW*cos(kwv*xf(i))
+                zStarxh = hl + epsW*cos(kwv*xh(i))
+                
+
+                rlpert = 1/(1+Lambda)*(-(xlv/Rv/T0)*thetaCloud + rtCloud)
+
+                !if(zp.ge.-1.0.and.Scrpl.gt.0)then
+                !if((zh(i,j,k)-hl).ge.-3*epsW.and.Scrpl.gt.0)then
+                if(zh(i,j,k).gt.zStarxf)then
+
+                   up = uCloud
+
+                else
+
+                   up = uClear
+
+                endif
+
+                if(zf(i,j,k).gt.zStarxh)then
+
+                   wp = wCloud
+
+                else
+
+                   wp = wClear
+
+                endif
+
+                if(zh(i,j,k).gt.zStarxh)then
+
+                   thp = thetaCloud
+                   rtp = rtCloud
+                   rlp = rlpert
+
+                else
+
+                   thp = thetaClear
+                   rtp = rtClear
+                   rlp = 0
+
+                endif
+
+                ua(i,j,k) = up
+                wa(i,j,k) = wp
+                                
+                rlTilde = rlp
+                rTTilde = rtp
+                !rvTilde = rTTilde - rlTilde
+
+                if(zh(i,j,k).gt.zStarxh)then
+
+                   qa(i,j,k,nqc) = qc0(i,j,k) + qvSat(i,j,k)*(rlpert)
+                   qa(i,j,k,nqv) = (qv0(i,j,k) + qc0(i,j,k) + &
+                        qvSat(i,j,k)*(rTTilde)) - qa(i,j,k,nqc)
+
+                else
+
+                   qa(i,j,k,nqv) = qv0(i,j,k) + qvSat(i,j,k)*rTTilde
+                   qa(i,j,k,nqc) = qc0(i,j,k)
+                   !qa(i,j,k,nqc) = 0
+
+                endif
+
+                ! HAVE YET TO CONSIDER IF THETA IS CORRECT!!!!!!!
+
+                tback = pi0(i,j,k)*th0(i,j,k)
+
+                tTot = tback + tSat(i,j,k)*(thp + Lambda*T0*(Rv/xlv)*rlp)
+                ! r_l=qa(i,j,k,nqc); (r_l)_L = qc0(i,j,k) ! This was commented out prior to Oct5th 2020
+                !tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                !     exp(xlv/cp*(qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback)) - 1)
+
+                tha(i,j,k) = th0(i,j,k)*((1+thp)* &
+                     exp(xlv/cp*(qa(i,j,k,nqc)/tTot))/exp(xlv/cp*(qc0(i,j,k)/tback)) - 1)
+
+                !tha(i,j,k) = zStarxh
+
+                !tha(i,j,k) = rlpert
+                !tha(i,j,k) = qc0(i,j,k) - qc0(i,j,k)
+
+                !tha(i,j,k) = (exp((qa(i,j,k,nqc)/tTot))/exp((qc0(i,j,k)/tback)))**xlv/cp
+                !tha(i,j,k) = exp(qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback)**xlv/cp
+                !tha(i,j,k) = 1+thp
+                !tha(i,j,k) = qa(i,j,k,nqc)/tTot - qc0(i,j,k)/tback
+                !tha(i,j,k) = qa(i,j,k,nqc) - qc0(i,j,k);
+                !tha(i,j,k) = 0;
+             enddo
+          enddo
+       enddo
 
        call bcu(ua)
        call bcw(wa,1)       

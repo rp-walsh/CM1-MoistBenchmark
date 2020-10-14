@@ -281,6 +281,9 @@
 !  isnd = 1001 (RPW)
 !  MBM Critically saturated constant moist unsaturated BVF + perturbed 
 !  cloud layer (cloud over clear)
+!  
+! This one appears to be the updated dimensional cloud layer background
+! compared to 1002 which is likely an older version of this.
 
       ELSEIF(isnd.eq.1001)then
          
@@ -346,11 +349,13 @@
                n=n+1
                
                if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
-               if(abs(th0(i,j,k)-thlast).gt.0.0001 .and. n.lt.200)then
+               !if(abs(th0(i,j,k)-thlast).gt.0.0001 .and. n.lt.200)then
+               if(abs(th0(i,j,k)-thlast).gt.1E-4 .and. n.lt.500)then
                   th0(i,j,k)=thlast+0.3*(th0(i,j,k)-thlast)
                   go to 981
-               elseif(n.ge.200)then
-                  if(dowr) write(outfile,*) '  stuck in loop (111)!'
+               !elseif(n.ge.200)then
+               elseif(n.ge.500)then
+                  if(dowr) write(outfile,*) '  stuck in loop (112)!'
                   call stopcm1
                endif
                
@@ -397,10 +402,12 @@
                   n=n+1
                   
                   if(n.gt.180.and.dowr) write(outfile,*) n,prs0(i,j,k),thlast,th0(i,j,k),th0(i,j,k)-thlast
-                  if(abs(th0(i,j,k)-thlast).gt.0.0005 .and. n.lt.200)then
+                  !if(abs(th0(i,j,k)-thlast).gt.0.0005 .and. n.lt.200)then
+                  if(abs(th0(i,j,k)-thlast).gt.1E-4 .and. n.lt.500)then
                      th0(i,j,k)=thlast+0.3*(th0(i,j,k)-thlast)
                      go to 982
-                  elseif(n.ge.200)then
+                  !elseif(n.ge.200)then
+                  elseif(n.ge.500)then
                      if(dowr) write(outfile,*) '  stuck in loop (333)!'
                      print *,'  prs,thlast,thn = ',prs0(i,j,k),thlast,thn
                      call stopcm1
@@ -452,8 +459,12 @@
          do k=kb,ke
             do j=jb,je
                do i=ib,ie
-
-                  zprime = zh(i,j,k)/HScale + z_bot
+                  
+                  if(MBM_dim.eq.1)then
+                     zprime = (zh(i,j,k) - MBM_hl)/MBM_hl
+                  else
+                     zprime = zh(i,j,k)/HScale + z_bot
+                  endif
                   qv_pert = mstScale*mst_grad*zprime
 
                   qt0(i,j,k) = qv0(i,j,k)*(1+qv_pert)
@@ -476,8 +487,12 @@
 
          ! Compute surface theta_rho for hydrostatic integration
          qv_sat=rslf(p_sfc,t_sfc)
-         qv_pert = mstScale*mst_grad*z_bot
-         
+         if(MBM_dim.eq.1)then
+            qv_pert = mstScale*mst_grad*(-1)
+         else
+            qv_pert = mstScale*mst_grad*z_bot
+         endif
+
          if (qv_pert.le.0) then
             qv_sfc = qv_sat*(1+qv_pert)
             qc_sfc = 0.0
@@ -528,11 +543,14 @@
                n=n+1
 
                !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
-               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.0001 .and. n.lt.200)then
+               !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.0001 .and. n.lt.200)then
+               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
                   qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
                   go to 983
-               elseif(n.ge.200)then
-                  if(dowr) write(outfile,*) '  stuck in loop (111)!'
+               !elseif(n.ge.200)then
+               elseif(n.ge.500)then
+                  !if(dowr) write(outfile,*) '  stuck in loop (111)! '
+                  if(dowr) write(outfile,*) '  stuck in moist loop1 '
                   call stopcm1
                endif
 
@@ -575,11 +593,14 @@
                   n=n+1
                   
                   !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
-                  if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.00001 .and. n.lt.200)then
+                  !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.00001 .and. n.lt.200)then
+                  if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-5 .and. n.lt.5000)then
                      qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
                      go to 984
-                  elseif(n.ge.200)then
-                     if(dowr) write(outfile,*) '  stuck in loop (111)!'
+                  !elseif(n.ge.200)then
+                  elseif(n.ge.5000)then
+                     !if(dowr) write(outfile,*) '  stuck in loop (111)! HERE'
+                     if(dowr) write(outfile,*) '  stuck in moist loop2 '
                      call stopcm1
                   endif
                   !write( *, * ) 'Test2 converged', qc0(i,j,k), k, zh(i,j,k)

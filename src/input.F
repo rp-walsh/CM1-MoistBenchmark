@@ -172,6 +172,8 @@
 
       real :: MBM_P0,MBM_T0,MBM_HScale,MBM_LScale,MBM_UScale,MBM_alpha
       real :: MBM_zB,MBM_zT,MBM_ns,MBM_thsfc,MBM_pisfc,MBM_epsW,MBM_omega,MBM_kwv
+      integer :: MBM_dim
+      real :: MBM_Ht,MBM_hl,MBM_mClear,MBM_mCloud
 
 !-----------------------------------------------------------------------
 
@@ -271,7 +273,9 @@
               doazimavg,azimavgfrq,ddr,rlen
       namelist /MBMparam/                                                     &
            MBM_P0,MBM_T0,MBM_HScale,MBM_LScale,MBM_UScale,MBM_alpha,          &
-           MBM_zB,MBM_zT,MBM_ns,MBM_thsfc,MBM_pisfc,MBM_epsW,MBM_omega,MBM_kwv
+           MBM_zB,MBM_zT,MBM_ns,MBM_thsfc,MBM_pisfc,MBM_epsW,MBM_omega,       &
+           MBM_kwv,                                                           &
+           MBM_dim,MBM_Ht,MBM_hl,MBM_mClear,MBM_mCloud
 
     CONTAINS
 

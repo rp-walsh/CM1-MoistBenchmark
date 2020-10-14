@@ -675,7 +675,9 @@
       real :: dtsm
 
       ! GHB:  this value is arbitrary ... could be probably be changed
-      integer, parameter :: max_nsound = 48
+      !integer, parameter :: max_nsound = 48
+      ! RPW value
+      integer, parameter :: max_nsound = 200
 
       IF( psolver.eq.1 .or. psolver.eq.4 .or. psolver.eq.5 )THEN
 
