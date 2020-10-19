@@ -2,7 +2,7 @@
  &param0
  nx           =     128,
  ny           =       1,
- nz           =     512,
+ nz           =     128,
  nodex        =       1,
  nodey        =       1,
  ppnode       =      36,
@@ -15,7 +15,7 @@
  &param1
  dx     =   65.7759199176,
  dy     =   100.0,
- dz     =   9.533110119074999,
+ dz     =   38.1324404763,
  dtl    =   1.0,
  !timax  =  5000.0,
  timax  =  570.0,
@@ -71,7 +71,7 @@
  tbc       =  1,
  irbc      =  4,
  roflux    =  0,
- isnd      = 1003,
+ isnd      = 1000,
  iwnd      =  0,
  itern     =  0,
  iinit     = 9999,
@@ -219,7 +219,7 @@
  &param9
  output_path      = 'MBBMResults/',
  !output_path      = './',
- output_basename  = 'fit2cm1CldLyrBck03h2500TST',
+ output_basename  = 'fit2cm1CritSatBckh2500',
  output_format    = 2,
  output_filetype  = 1,
  output_interp    = 0,

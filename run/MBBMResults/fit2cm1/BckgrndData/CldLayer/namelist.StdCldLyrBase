@@ -2,7 +2,7 @@
  &param0
  nx           =     128,
  ny           =       1,
- nz           =     512,
+ nz           =     800,
  nodex        =       1,
  nodey        =       1,
  ppnode       =      36,
@@ -13,14 +13,13 @@
  /
 
  &param1
- dx     =   65.7759199176,
+ dx     =   5.4253472222,
  dy     =   100.0,
- dz     =   9.533110119074999,
- dtl    =   1.0,
- !timax  =  5000.0,
- timax  =  570.0,
+ dz     =   10,
+ dtl    =   0.2,
+ timax  =  5000.0,
  run_time =  -999.9,
- tapfrq =    5.0,
+ tapfrq =    50.0,
  rstfrq = -3600.0,
  statfrq =   60.0,
  prclfrq =   60.0,
@@ -53,7 +52,7 @@
  doimpl    =  1,
  irdamp    =  0,
  hrdamp    =  0,
- psolver   =  4,
+ psolver   =  2,
  ptype     =  6,
  ihail     =  1,
  iautoc    =  1,
@@ -71,7 +70,7 @@
  tbc       =  1,
  irbc      =  4,
  roflux    =  0,
- isnd      = 1003,
+ isnd      = 1001,
  iwnd      =  0,
  itern     =  0,
  iinit     = 9999,
@@ -193,21 +192,21 @@
  /
 
  &MBMparam
- MBM_P0     =   74336.5156250000,
- MBM_T0     =   284.3757629395,
- MBM_ns     =   2.84E-4, !Dimensional BVF
- MBM_thsfc  =   288, ! th_sfc (consistent with CCL backgrounds)
- MBM_pisfc  =   1.0, ! pi_sfc (consistent with CCL backgrounds)
- MBM_epsW   =   .025,
- MBM_omega  =   0.0111928352,
- MBM_kwv    =   0.0007462820,
- MBM_alpha  =   1.0, ! alpha (mst_grad)
+ MBM_P0     =   94269.0938000000,
+ MBM_T0     =   287.2930000000,
  MBM_HScale =   176.8388256577,  ! HScale
  MBM_LScale =   176.8388256577,  ! LScale	
  MBM_UScale =   0.6250, ! UScale	
+ MBM_alpha  =   1.0, ! alpha (mst_grad)
  MBM_zB     =   -2.1991148575, ! zB (CCL bottom shift)
  MBM_zT     =   5, !(pi) zT (CCL bottom shift)
  !MBM_zT     =   5.8328827643, !(pi) zT (CCL bottom shift)
+ MBM_ns     =   2.84E-4, !Dimensional BVF
+ MBM_thsfc  =   288, ! th_sfc (consistent with CCL backgrounds)
+ MBM_pisfc  =   1.0, ! pi_sfc (consistent with CCL backgrounds)
+ MBM_epsW   =   .1,
+ MBM_omega  =   0.7830362964,
+ MBM_kwv    =   1.6,
 !------Dimensional solution param------------
  MBM_dim    =   1,
  MBM_Ht     =   4880.9523809638,
@@ -218,8 +217,7 @@
 
  &param9
  output_path      = 'MBBMResults/',
- !output_path      = './',
- output_basename  = 'fit2cm1CldLyrBck03h2500TST',
+ output_basename  = 'StdCldLyrBase',
  output_format    = 2,
  output_filetype  = 1,
  output_interp    = 0,
@@ -254,13 +252,13 @@
  output_qvpert    = 1,
  output_q         = 1,
  output_dbz       = 0,
- output_buoyancy  = 0,
+ output_buoyancy  = 1,
  output_u         = 1,
  output_upert     = 0,
  output_uinterp   = 1,
- output_v         = 0,
+ output_v         = 1,
  output_vpert     = 0,
- output_vinterp   = 0,
+ output_vinterp   = 1,
  output_w         = 1,
  output_winterp   = 1,
  output_vort      = 0,

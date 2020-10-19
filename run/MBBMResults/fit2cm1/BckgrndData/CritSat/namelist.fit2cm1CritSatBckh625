@@ -2,7 +2,7 @@
  &param0
  nx           =     128,
  ny           =       1,
- nz           =     512,
+ nz           =     128,
  nodex        =       1,
  nodey        =       1,
  ppnode       =      36,
@@ -13,12 +13,12 @@
  /
 
  &param1
- dx     =   65.7759199176,
+ dx     =   16.4439799794,
  dy     =   100.0,
- dz     =   9.533110119074999,
- dtl    =   1.0,
+ dz     =   9.5331101191,
+ dtl    =   1,
  !timax  =  5000.0,
- timax  =  570.0,
+ timax  =  570,
  run_time =  -999.9,
  tapfrq =    5.0,
  rstfrq = -3600.0,
@@ -71,7 +71,7 @@
  tbc       =  1,
  irbc      =  4,
  roflux    =  0,
- isnd      = 1003,
+ isnd      = 1000,
  iwnd      =  0,
  itern     =  0,
  iinit     = 9999,
@@ -196,30 +196,30 @@
  MBM_P0     =   74336.5156250000,
  MBM_T0     =   284.3757629395,
  MBM_ns     =   2.84E-4, !Dimensional BVF
- MBM_thsfc  =   288, ! th_sfc (consistent with CCL backgrounds)
- MBM_pisfc  =   1.0, ! pi_sfc (consistent with CCL backgrounds)
+ MBM_thsfc  =   303.9723510742, ! th_sfc (consistent with CCL backgrounds)
+ MBM_pisfc  =   0.9385818839, ! pi_sfc (consistent with CCL backgrounds)
  MBM_epsW   =   .025,
  MBM_omega  =   0.0111928352,
- MBM_kwv    =   0.0007462820,
+ MBM_kwv    =   0.0029851280,
  MBM_alpha  =   1.0, ! alpha (mst_grad)
  MBM_HScale =   176.8388256577,  ! HScale
  MBM_LScale =   176.8388256577,  ! LScale	
- MBM_UScale =   0.6250, ! UScale	
+ MBM_UScale =   0.156250, ! UScale	
  MBM_zB     =   -2.1991148575, ! zB (CCL bottom shift)
  MBM_zT     =   5, !(pi) zT (CCL bottom shift)
  !MBM_zT     =   5.8328827643, !(pi) zT (CCL bottom shift)
 !------Dimensional solution param------------
  MBM_dim    =   1,
- MBM_Ht     =   4880.9523809638,
- MBM_hl     =   2500.0000000000,
- MBM_mClear =   0.0008400000,
- MBM_mCloud =   0.0003048111,
+ MBM_Ht     =   1220.2380952410,
+ MBM_hl     =   625.0000000000,
+ MBM_mClear =   0.0033600000,
+ MBM_mCloud =   0.0012192445,
  /
 
  &param9
  output_path      = 'MBBMResults/',
  !output_path      = './',
- output_basename  = 'fit2cm1CldLyrBck03h2500TST',
+ output_basename  = 'fit2cm1CritSatBckh625',
  output_format    = 2,
  output_filetype  = 1,
  output_interp    = 0,

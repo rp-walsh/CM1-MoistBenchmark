@@ -620,6 +620,352 @@
          
          qsurf = cgs1*qv0(1,1,1)+cgs2*qv0(1,1,2)+cgs3*qv0(1,1,3) 
 
+!-----------------------------------------------------------------------
+!  isnd = 1003 (RPW)
+!  MBM Critically saturated constant moist unsaturated BVF + perturbed 
+!  cloud layer (cloud over clear)
+!  
+!  Currently in development. Same as 1001 but attempting to make the 
+!  formation of liquid water more consistent between boussinesq runs
+!
+
+      ELSEIF(isnd.eq.1003)then
+         
+         if(dowr) write(outfile,*) '  isnd = 1003'
+         
+         ! Define Brunt-Vaisala frequency N^2
+         ns =  MBM_ns
+         
+         ! Define Surface conditions
+         th_sfc   =  MBM_thsfc
+         pi_sfc   =  MBM_pisfc
+         !-----
+         p_sfc=p00*(pi_sfc**(cp/rd))
+         t_sfc=th_sfc*pi_sfc
+         qv_sfc=rslf(p_sfc,t_sfc)
+         thv_sfc=th_sfc*(1.0+reps*qv_sfc)/(1.0+qv_sfc)
+
+         !---------------------------------------------------------
+         ! Determine critically saturated constant Nm^2 background
+         ! Same as isnd=1000
+         !---------------------------------------------------------
+
+         do kk=kb,ke
+            do jj=jb,je
+               do ii=ib,ie
+                  ! DEFINE \theta_v here for constant Nm^2 (unsaturated)
+                  thv0(ii,jj,kk) = thv_sfc*exp(ns/g*zh(ii,jj,kk));
+               enddo
+            enddo
+         enddo
+         
+         if(dowr) write(outfile,*)
+         do j=jb,je
+            do i=ib,ie
+               
+               !---------- do k=1 first ----------!
+               k=1
+               n=1
+
+               ! Discretely step pressure forward
+               pi0(i,j,k)=pi_sfc-g*zh(i,j,k)/(cp*0.5*(thv0(i,j,k)+thv_sfc))
+               prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+
+               ! Initial guess for moisture profile at zh(i,j,1)
+               qv0(i,j,k)=qv_sfc
+
+               ! Initial theta at zh(i,j,1)
+               th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+
+               ! Nonlinear-loop for theta
+781            continue
+               
+               ! Update tempreature
+               t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+               
+               ! Update moisture profile
+               qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+
+               ! Update Theta
+               thlast = th0(i,j,k)
+               th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+               
+               n=n+1
+               
+               if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+               !if(abs(th0(i,j,k)-thlast).gt.0.0001 .and. n.lt.200)then
+               if(abs(th0(i,j,k)-thlast).gt.1E-4 .and. n.lt.500)then
+                  th0(i,j,k)=thlast+0.3*(th0(i,j,k)-thlast)
+                  go to 781
+               !elseif(n.ge.200)then
+               elseif(n.ge.500)then
+                  if(dowr) write(outfile,*) '  stuck in loop (112)!'
+                  call stopcm1
+               endif
+               
+               ! Update Temperature and moisture to match theta
+               t0(i,j,k)=th0(i,j,k)*pi0(i,j,k)
+               qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+               
+               if(qc0(i,j,1).lt.0.0)then
+                  print *,'  calling stopcm1 (222) '
+                  call stopcm1
+               endif
+               if(i.eq.1.and.j.eq.1.and.dowr) write(outfile,*) k,n,th0(i,j,k),prs0(i,j,k)
+
+               !---------- done with k=1, do all other levels ----------!
+               
+               do k=2,nk
+                  
+                  n=1
+                  delz=zh(i,j,k)-zh(i,j,k-1)
+
+                  ! Discretely step pressure forward
+                  pi0(i,j,k)=pi0(i,j,k-1) - g*delz/(cp*0.5*(thv0(i,j,k)+thv0(i,j,k-1)))
+                  prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+                  
+                  ! Initial guess for moisture profile at zh(i,j,k)
+                  qv0(i,j,k)=qv0(i,j,k-1)
+                  
+                  ! Initial theta at zh(i,j,k)
+                  th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+                  
+                  ! Nonlinear-loop for theta
+782               continue
+                  
+                  ! Update tempreature
+                  t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+                  
+                  ! Update moisture profile
+                  qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+                  
+                  ! Update Theta
+                  thlast = th0(i,j,k)
+                  th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+                  
+                  n=n+1
+                  
+                  if(n.gt.180.and.dowr) write(outfile,*) n,prs0(i,j,k),thlast,th0(i,j,k),th0(i,j,k)-thlast
+                  !if(abs(th0(i,j,k)-thlast).gt.0.0005 .and. n.lt.200)then
+                  if(abs(th0(i,j,k)-thlast).gt.1E-4 .and. n.lt.500)then
+                     th0(i,j,k)=thlast+0.3*(th0(i,j,k)-thlast)
+                     go to 782
+                  !elseif(n.ge.200)then
+                  elseif(n.ge.500)then
+                     if(dowr) write(outfile,*) '  stuck in loop (333)!'
+                     print *,'  prs,thlast,thn = ',prs0(i,j,k),thlast,thn
+                     call stopcm1
+                  endif
+                  
+                  ! Update Temperature and moisture to match theta
+                  t0(i,j,k)=th0(i,j,k)*pi0(i,j,k)
+                  qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+                  
+                  if(qc0(i,j,1).lt.0.0)then
+                     print *,'  calling stopcm1 (444) '
+                     call stopcm1
+                  endif
+
+                  if(i.eq.1.and.j.eq.1.and.dowr) write(outfile,*) k,n,t0(i,j,k),fliq,fice
+
+               enddo  ! enddo for k loop
+               
+            enddo  ! enddo for i loop
+
+         enddo  ! enddo for j loop
+
+         !---------------------------------------------------------
+         ! END
+         ! Determine critically saturated constant Nm^2 background
+         ! Same as isnd=1000
+         !---------------------------------------------------------
+
+         !---------------------------------------------------------
+         ! Perturb background to include cloud layer
+         !---------------------------------------------------------
+
+         ! Extract TIR Parameters 
+         HScale = MBM_HScale
+         UScale = MBM_UScale
+         mst_grad = MBM_alpha !moisture gradient (alpha)
+         z_bot = MBM_zB !CCL bottom shift
+
+         ! Compute moisture scale (CCL)
+         mstScale = xlv/rv/MBM_T0*UScale/sqrt(cp*MBM_T0) ! var4 = T0 from CCL
+
+         !write( *, * ) 'Press Enter to continue alpha=', mst_grad 
+         !read( *, * )
+
+         ! Copy th_l0 for theta correction
+         thl0 = th0
+
+         ! Perturb moisture profile
+         do k=kb,ke
+            do j=jb,je
+               do i=ib,ie
+                  
+                  if(MBM_dim.eq.1)then
+                     zprime = (zh(i,j,k) - MBM_hl)/MBM_hl
+                  else
+                     zprime = zh(i,j,k)/HScale + z_bot
+                  endif
+                  qv_pert = mstScale*mst_grad*zprime
+
+                  qt0(i,j,k) = qv0(i,j,k)*(1+qv_pert)
+
+                  !if (qv_pert.le.0) then
+                  !   qv0(i,j,k) = qv0(i,j,k)*(1+qv_pert)
+                  !   qc0(i,j,k) = 0.0
+                  !   qt_cur = qv0(i,j,k)
+                  !else
+                  !   qc0(i,j,k) = qv0(i,j,k)*qv_pert
+                  !   qt_cur = qv0(i,j,k) + qc0(i,j,k)
+                  !end if
+                  !
+                  ! Compute thr0
+                  !thr0(i,j,k) = th0(i,j,k)*(1 + reps*qv0(i,j,k))/(1 + qt_cur)
+
+               enddo
+            enddo
+         enddo
+
+         ! Compute surface theta_rho for hydrostatic integration
+         qv_sat=rslf(p_sfc,t_sfc)
+         if(MBM_dim.eq.1)then
+            qv_pert = mstScale*mst_grad*(-1)
+         else
+            qv_pert = mstScale*mst_grad*z_bot
+         endif
+
+         if (qv_pert.le.0) then
+            qv_sfc = qv_sat*(1+qv_pert)
+            qc_sfc = 0.0
+            qt_sfc = qv_sfc
+         else
+            qv_sfc = qv_sat
+            qc_sfc = qv_sat*qv_pert
+            qt_sfc = qv_sfc + qc_sfc
+         end if
+         
+         thr_sfc = th_sfc*(1.0+reps*qv_sfc)/(1.0+qt_sfc)
+         
+         ! Recompute hydro static pressure
+         do j=jb,je
+            do i=ib,ie               
+               k = 1
+               n = 1
+               
+783            continue
+               
+               ! Note initial(n=1) qv_sat is sat value from surface
+               if (qt0(i,j,k).gt.qv_sat) then
+                  qv0(i,j,k) = qv_sat
+                  qc0(i,j,k) = qt0(i,j,k) - qv_sat
+               else
+                  qv0(i,j,k) = qt0(i,j,k)
+                  qc0(i,j,k) = 0.0
+               end if
+               
+               ! Modify th0 if liquid is present
+               if (qc0(i,j,k).gt.0) then
+                  th0(i,j,k) = thl0(i,j,k)*exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
+               end if
+            
+               thr0(i,j,k) = th0(i,j,k)*(1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+               
+               ! Discretely step pressure forward (k=1)
+               pi0(i,j,k)=pi_sfc-g*zh(i,j,k)/(cp*0.5*(thr0(i,j,k)+thr_sfc))
+               prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+               
+               ! Update tempreature
+               t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+               
+               ! Update saturation mixing ratio
+               qv_satOld = qv_sat
+               qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+
+               n=n+1
+
+               !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+               !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.0001 .and. n.lt.200)then
+               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
+                  qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                  go to 783
+               !elseif(n.ge.200)then
+               elseif(n.ge.500)then
+                  !if(dowr) write(outfile,*) '  stuck in loop (111)! '
+                  if(dowr) write(outfile,*) '  stuck in moist loop1 '
+                  call stopcm1
+               endif
+               
+               do k=2,ke
+                  delz=zh(i,j,k)-zh(i,j,k-1)
+                  n = 1
+
+                  qv_sat = qv0(i,j,k)
+
+784               continue
+
+                  ! Note initial(n=1) qv_sat is sat value from previous height
+                  if (qt0(i,j,k).gt.qv_sat) then
+                     qv0(i,j,k) = qv_sat
+                     qc0(i,j,k) = qt0(i,j,k) - qv_sat
+                     write( *, * ) 'Test1', qc0(i,j,k), k, zh(i,j,k), n
+                     read( *, * )
+                  else
+                     qv0(i,j,k) = qt0(i,j,k)
+                     qc0(i,j,k) = 0.0
+                  end if
+                  
+                  ! Modify th0 if liquid is present
+                  if (qc0(i,j,k).gt.0) then
+                     th0(i,j,k) = thl0(i,j,k)*exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
+                  end if
+
+                  thr0(i,j,k) = th0(i,j,k)*(1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+                  
+                  ! Discretely step pressure forward (k=1)
+                  !pi0(i,j,k)=pi_sfc-g*zh(i,j,k)/(cp*0.5*(thr0(i,j,k)+thr_sfc))
+                  pi0(i,j,k)=pi0(i,j,k-1) - g*delz/(cp*0.5*(thr0(i,j,k)+thr0(i,j,k-1)))
+                  prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+                  
+                  ! Update tempreature
+                  t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+                  
+                  ! Update saturation mixing ratio
+                  qv_satOld = qv_sat
+                  qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+                  
+                  n=n+1
+                  
+                  !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+                  !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.00001 .and. n.lt.200)then
+                  if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.5000)then
+                     qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                     go to 784
+                  !elseif(n.ge.200)then
+                  elseif(n.ge.5000)then
+                     !if(dowr) write(outfile,*) '  stuck in loop (111)! HERE'
+                     if(dowr) write(outfile,*) '  stuck in moist loop2 '
+                     call stopcm1
+                  endif
+                  !write( *, * ) 'Test2 converged', qc0(i,j,k), k, zh(i,j,k)
+                  !read( *, * )
+               enddo
+               !write( *, * ) 'Test3', qc0(i,j,k), k, zh(i,j,k)
+               !read( *, * )
+            enddo
+         enddo
+
+         !do k=2,ke
+         !   write( *, * ) 'Test4', qc0(10,10,k), k, zh(10,10,k)
+         !   read( *, * )
+         !enddo
+         
+         if(dowr) write(outfile,*)
+         
+         qsurf = cgs1*qv0(1,1,1)+cgs2*qv0(1,1,2)+cgs3*qv0(1,1,3) 
+
 !------------------------------------------------------------------
 !  isnd = 1002 (RPW)
 !  MBM Critically saturated constant moist unsaturated BVF + perturbed 
