@@ -10,3 +10,8 @@
 
 # Ignore emacs files
 *~
+
+# Results directory
+/run/MBBMResults
+/run/DebugRes/
+/run/RunOutputs
