@@ -1656,11 +1656,13 @@
 
                !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
                !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.0001 .and. n.lt.200)then
-               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
+               !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
+               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-5 .and. n.lt.500)then
                   qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
                   go to 483
                !elseif(n.ge.200)then
                elseif(n.ge.500)then
+                  write(*,*) qv_sat, qv_satOld
                   !if(dowr) write(outfile,*) '  stuck in loop (111)! '
                   if(dowr) write(outfile,*) '  stuck in moist loop1&
                        &isnd=1004'

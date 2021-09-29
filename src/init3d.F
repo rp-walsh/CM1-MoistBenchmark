@@ -3183,90 +3183,102 @@
                 ! cycles. Negitive cloud water is generated indicates
                 ! clear conditions to be fixed at stopping criteria
 
-                ncount = 0;
-                cyclcount = 0;
-                rsat_oldold = 0;
-                rsat_old = rslf(prs0(i,j,k),Th)
-                do
-                   ncount = ncount + 1
-                   
-                   T = (th0(i,j,k) + tha(i,j,k))*pi0(i,j,k)
-                   
-                   rsat_new = rslf(prs0(i,j,k),T)
- 
-                   ! Cloud equations
+                if(zh(i,j,k).ge.Hl*(1-2*delta))then
+                   ncount = 0;
+                   cyclcount = 0;
+                   rsat_oldold = 0;
+                   rsat_old = rslf(prs0(i,j,k),Th)
+                   do
+                      ncount = ncount + 1
+                      
+                      T = (th0(i,j,k) + tha(i,j,k))*pi0(i,j,k)
+                      
+                      rsat_new = rslf(prs0(i,j,k),T)
+                      
+                      ! Cloud equations
+                      
+                      qa(i,j,k,nqv) = rsat_new
+                      qa(i,j,k,nqc) = rtcld(i,j,k) - rsat_new
+                      
+                      tha(i,j,k) = th0(i,j,k)*((1+thltcld(i,j,k))* &
+                           exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                           qa(i,j,k,nqc)/T)) - 1)
+                      
+                      
+                      ! Stopping criteria
+                      ! 1e-5 is currently the best I can do.
+                      if(abs((rsat_new - rsat_old)/rsat_new).lt.1e-5)then
+                         
+                         ! write(*,*) 'converged at'
+                         ! write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
+                         !      'itterations =', ncount
+                         
+                         ! fix to clear for negative cloud water
+                         if(qa(i,j,k,nqc).lt.0.0)then
+                            
+                            qa(i,j,k,nqv) = rtclr(i,j,k)
+                            qa(i,j,k,nqc) = 0.0
+                            
+                            tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
+                                 exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                                 qa(i,j,k,nqc)/T)) - 1)
+                            
+                         endif
+                         
+                         exit
+                         
+                         ! elseif(ncount.gt.500.and. &
+                         !      rsat_oldold.eq.rsat_new.and. &
+                         !      qa(i,j,k,nqc).lt.0.0)then
+                         
+                         !    write(*,*) '2-cycle found in clear skipping'
+                         !    write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
+                         !         'itterations =', ncount
+                         
+                         !    exit
+                         
+                         
+                      elseif(ncount.gt.500)then
+                         
+                         write(*,*) 'iinit 1010 itteration did not &
+                              &converge'
+                         write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
+                              'itterations =', ncount
+                         write(*,*) 'rsat_oldold', rsat_oldold, &
+                              'rsat_old', rsat_old, &
+                              'rsat_new', rsat_new
+                         
+                         stop
+                         
+                      else
+                         
+                         ! if(xh(i).eq.-2851.23340.and. &
+                         !      zh(i,j,k).eq.2229.16650)then
+                         !    write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
+                         !         'ncount=',ncount
+                         !    write(*,*) 'rsat_old', rsat_old, &
+                         !         'rsat_new', rsat_new
+                         !    write(*,*) 'liquid=', qa(i,j,k,nqc)
+                         
+                         ! endif
+                         
+                         rsat_oldold = rsat_old
+                         rsat_old = rsat_new
+                         
+                      endif
+                      
+                   enddo ! itteration end do
 
-                   qa(i,j,k,nqv) = rsat_new
-                   qa(i,j,k,nqc) = rtcld(i,j,k) - rsat_new
+                else
+
+                   qa(i,j,k,nqv) = rtclr(i,j,k)
+                   qa(i,j,k,nqc) = 0.0
                    
-                   tha(i,j,k) = th0(i,j,k)*((1+thltcld(i,j,k))* &
+                   tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
                         exp(-xlv/cp*(qc0(i,j,k)/Th - &
                         qa(i,j,k,nqc)/T)) - 1)
                    
-
-                   ! Stopping criteria
-                   ! 1e-5 is currently the best I can do.
-                   if(abs((rsat_new - rsat_old)/rsat_new).lt.1e-5)then
-
-                      write(*,*) 'converged at'
-                      write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
-                           'itterations =', ncount
-
-                      ! fix to clear for negative cloud water
-                      if(qa(i,j,k,nqc).lt.0.0)then
-                         
-                         qa(i,j,k,nqv) = rtclr(i,j,k)
-                         qa(i,j,k,nqc) = 0.0
-                         
-                         tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
-                              exp(-xlv/cp*(qc0(i,j,k)/Th - &
-                              qa(i,j,k,nqc)/T)) - 1)
-                         
-                      endif
-                         
-                      exit
-
-                   ! elseif(ncount.gt.500.and. &
-                   !      rsat_oldold.eq.rsat_new.and. &
-                   !      qa(i,j,k,nqc).lt.0.0)then
-
-                   !    write(*,*) '2-cycle found in clear skipping'
-                   !    write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
-                   !         'itterations =', ncount
-
-                   !    exit
-                      
-                      
-                   elseif(ncount.gt.500)then
-                      
-                      write(*,*) 'iinit 1010 itteration did not &
-                           &converge'
-                      write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
-                           'itterations =', ncount
-                      write(*,*) 'rsat_oldold', rsat_oldold, &
-                           'rsat_old', rsat_old, &
-                           'rsat_new', rsat_new
-                      
-                      stop
-                      
-                   else
-
-                      ! if(xh(i).eq.-2851.23340.and. &
-                      !      zh(i,j,k).eq.2229.16650)then
-                      !    write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
-                      !         'ncount=',ncount
-                      !    write(*,*) 'rsat_old', rsat_old, &
-                      !         'rsat_new', rsat_new
-                      !    write(*,*) 'liquid=', qa(i,j,k,nqc)
-                         
-                      ! endif
-                      
-                      rsat_oldold = rsat_old
-                      rsat_old = rsat_new
-                      
-                   endif
-
-                enddo ! itteration end do
+                endif
 
              enddo ! end j
           enddo ! end i

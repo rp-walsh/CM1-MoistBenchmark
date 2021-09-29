@@ -1,8 +1,8 @@
 
  &param0
- nx           =     600,
+ nx           =     64,
  ny           =       1,
- nz           =     600,
+ nz           =     64,
  nodex        =       1,
  nodey        =       1,
  ppnode       =      36,
@@ -13,14 +13,14 @@
  /
 
  &param1
- dx     =   1.1880932217,
+ dx     =   5.5691869768,
  dy     =   100.0,
- dz     =   1.0400000000,
+ dz     =   4.87500,
  dtl    =   1.0,
 ! timax  =  100.0,
- timax  =  1089.0,
+ timax  =  1090.0,
  run_time =  -999.9,
- tapfrq =    11.0,
+ tapfrq =    10.0,
  rstfrq = -3600.0,
  statfrq =   60.0,
  prclfrq =   60.0,
@@ -77,7 +77,7 @@
  iinit     = 1010,
 ! iinit     = 9999,
  irandp    =  0,
- ibalance  =  1,
+ ibalance  =  2,
  iorigin   =  2,
  axisymm   =  0,
  imove     =  0,
@@ -197,12 +197,12 @@
  MBM_P0     =   72749.9922,
  MBM_T0     =   263.0861206,
  MBM_ns     =   2.08E-4, !Dimensional BVF
- MBM_thsfc  =   286.1674194336, ! th_sfc (consistent with CCL backgrounds)
- MBM_pisfc  =   0.9237818718, ! pi_sfc (consistent with CCL backgrounds)
+ MBM_thsfc  =   287.1286621094, ! th_sfc (consistent with CCL backgrounds)
+ MBM_pisfc  =   0.9184815884, ! pi_sfc (consistent with CCL backgrounds)
  MBM_HScale =   176.8388256577,  ! HScale (obsolete in isnd 1007)
  MBM_LScale =   176.8388256577,  ! LScale (obsolete in isnd 1007)
- MBM_UScale =   0.0780000000, ! UScale
- MBM_alpha  =   1.0, ! alpha (mst_grad)
+ MBM_UScale =   .156, ! UScale
+ MBM_alpha  =   0.5, ! alpha (mst_grad)
  MBM_zB     =   -2.1991148575, ! zB (CCL bottom shift) (obsolete in isnd 1007)
  MBM_zT     =   5, !(pi) zT (CCL bottom shift) (obsolete in isnd 1007)
  MBM_epsW   =   .05, ! delta
@@ -210,15 +210,15 @@
  MBM_kwv    =   2.75,
 !------Dimensional solution param------------
  MBM_dim    =   1,
- MBM_Ht     =   624.0,
- MBM_hl     =   312.0,
+ MBM_Ht     =   312.0,
+ MBM_hl     =   156.0,
  MBM_mClear =   2.0619439528,
  MBM_mCloud =   0.5612451752,
  /
 
  &param9
  output_path      = 'RunOutputs/',
- output_basename  = 'ThesisPSet3h312',
+ output_basename  = 'ThesisPSet1V4p3h156',
  output_format    = 2,
  output_filetype  = 1,
  output_interp    = 0,
