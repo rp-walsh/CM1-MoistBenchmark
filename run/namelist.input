@@ -13,14 +13,14 @@
  /
 
  &param1
- dx     =   5.5691869768,
+ dx     =   89.2497912952,
  dy     =   100.0,
- dz     =   4.87500,
+ dz     =   78.1250000000,
  dtl    =   1.0,
-! timax  =  100.0,
- timax  =  1090.0,
+ timax  =  5000.0,
+! timax  =  1090.0,
  run_time =  -999.9,
- tapfrq =    10.0,
+ tapfrq =    50.0,
  rstfrq = -3600.0,
  statfrq =   60.0,
  prclfrq =   60.0,
@@ -32,7 +32,7 @@
  adapt_dt  =  0,
  irst      =  0,
  rstnum    =  1,
- iconly    =  0,
+ iconly    =  1,
  hadvordrs =  5,
  vadvordrs =  5,
  hadvordrv =  5,
@@ -53,8 +53,8 @@
  doimpl    =  1,
  irdamp    =  0,
  hrdamp    =  0,
- psolver   =  5,
- ptype     =  6,
+ psolver   =  4,
+ ptype     =  5,
  ihail     =  1,
  iautoc    =  1,
  icor      =  0,
@@ -71,11 +71,11 @@
  tbc       =  1,
  irbc      =  4,
  roflux    =  0,
- isnd      = 1004,
+ isnd      = 1005,
  iwnd      =  0,
  itern     =  0,
- iinit     = 1010,
-! iinit     = 9999,
+! iinit     = 1010,
+ iinit     = 9999,
  irandp    =  0,
  ibalance  =  2,
  iorigin   =  2,
@@ -194,31 +194,31 @@
  /
 
  &MBMparam
- MBM_P0     =   72749.9922,
- MBM_T0     =   263.0861206,
+ MBM_P0     =   74116.0312500000,
+ MBM_T0     =   279.2378540039,
  MBM_ns     =   2.08E-4, !Dimensional BVF
- MBM_thsfc  =   287.1286621094, ! th_sfc (consistent with CCL backgrounds)
- MBM_pisfc  =   0.9184815884, ! pi_sfc (consistent with CCL backgrounds)
+ MBM_thsfc  =   288, ! th_sfc (consistent with CCL backgrounds)
+ MBM_pisfc  =   1.0, ! pi_sfc (consistent with CCL backgrounds)
  MBM_HScale =   176.8388256577,  ! HScale (obsolete in isnd 1007)
  MBM_LScale =   176.8388256577,  ! LScale (obsolete in isnd 1007)
- MBM_UScale =   .156, ! UScale
- MBM_alpha  =   0.5, ! alpha (mst_grad)
+ MBM_UScale =   1.25, ! UScale
+ MBM_alpha  =   1.0, ! alpha (mst_grad)
  MBM_zB     =   -2.1991148575, ! zB (CCL bottom shift) (obsolete in isnd 1007)
  MBM_zT     =   5, !(pi) zT (CCL bottom shift) (obsolete in isnd 1007)
  MBM_epsW   =   .05, ! delta
- MBM_omega  =   0.6050315051,
+ MBM_omega  =   0.6233273271,
  MBM_kwv    =   2.75,
 !------Dimensional solution param------------
  MBM_dim    =   1,
- MBM_Ht     =   312.0,
- MBM_hl     =   156.0,
+ MBM_Ht     =   5000,
+ MBM_hl     =   2500.0000000000,
  MBM_mClear =   2.0619439528,
  MBM_mCloud =   0.5612451752,
  /
 
  &param9
  output_path      = 'RunOutputs/',
- output_basename  = 'ThesisPSet1V4p3h156',
+ output_basename  = 'MIRV2-CL',
  output_format    = 2,
  output_filetype  = 1,
  output_interp    = 0,
@@ -275,7 +275,7 @@
  output_cin       = 0,
  output_lcl       = 0,
  output_lfc       = 0,
- output_pwat      = 0,
+ output_pwat      = 1,
  output_lwp       = 0,
  output_thbudget  = 0,
  output_qvbudget  = 0,
