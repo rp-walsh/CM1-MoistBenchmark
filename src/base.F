@@ -117,13 +117,14 @@
       real :: rhsfc,qtsfc,ql1,qt1,qt2,p1,tlr,qtlr
 
 !------------------------------------------------------------------
-      integer :: ii,jj
+      integer :: ii,jj,ncount
       real :: HScale, UScale, mst_grad, mstScale, qc_sfc, qv_pert, qv_sat
       real :: qv_satOld, thr_sfc, z_bot, zprime
       real, dimension(ib:ie,jb:je,kb:ke) :: qt0, thl0, thr0
       real, dimension(kb:ke) :: z_find
       real :: thr_0, pi_0, th_0, qv_sat0, pitst
       integer :: ClstIdx, idx1, idx2
+      real :: T_Old
       
 !------------------------------------------------------------------
 
@@ -2166,34 +2167,45 @@
                   qc0(i,j,k) = 0.0
                   
                endif
-                              
-               thr0(i,j,k) = th0(i,j,k)* &
-                    (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+
+               write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
+                    'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
+                    'th0 =  ', th0(i,j,k), &
+                    'prs0 =  ', prs0(i,j,k), 'T0 =  ', t0(i,j,k)
                
 383            continue
+               
+               th0(i,j,k) = thl0(i,j,k)* &
+                    exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
+               
+               
+               thr0(i,j,k) = th0(i,j,k)* &
+                    (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
 
+               
                ! Discretely step pressure forward (k=idx+1)
+               !pi0(i,j,k)=pi_0- &
+               !     g*delz/(cp*0.5*(thr0(i,j,k)+thr_0))
+
                pi0(i,j,k)=pi_0- &
-                    g*delz/(cp*0.5*(thr0(i,j,k)+thr_0))
+                    g*delz/(2*cp)*(1/thr0(i,j,k) + 1/thr_0)
                pitst=pi_0- &
                     g*delz/(cp*0.5*(thv0(i,j,k)+thr_0))
                
-               ! Modify th0 if liquid is present
-               !if (qc0(i,j,k).gt.0) then
-                  th0(i,j,k) = thl0(i,j,k)* &
-                       exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
-               !end if
 
                ! Update pressure
                prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
 
                ! Update tempreature
+               T_Old = t0(i,j,k)
                t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
-
+               
                ! Update saturation mixing ratio
                qv_satOld = qv_sat
                qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+
                qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+               t0(i,j,k) = T_Old + 0.3*(t0(i,j,k)-T_Old)
                ! The line above is the bug fix for isnd.eq.1004.
                ! This line was orignally inside the if statement
                ! below containing the goto statement. Due to its
@@ -2207,9 +2219,577 @@
                !     'qt0 =  ', qt0(i,j,k), &
                !     'tst =  ', qt0(i,j,k).gt.qv_sat
                
-               if (qt0(i,j,k).gt.qv_sat) then
+               !if (qt0(i,j,k).gt.qv_sat) then
                !if ((qt0(i,j,k) - qv_sat).gt.0.0) then
                   
+                  qv0(i,j,k) = qv_sat
+                  qc0(i,j,k) = qt0(i,j,k) - qv_sat
+                  
+               !else
+                  
+               !   qv0(i,j,k) = qt0(i,j,k)
+               !   qc0(i,j,k) = 0.0
+                  
+               !endif
+               
+               !thr0(i,j,k) = th0(i,j,k)* &
+               !     (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+
+               n=n+1
+
+               write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
+                    'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
+                    'th0 =  ', th0(i,j,k), &
+                    'prs0 =  ', prs0(i,j,k), 'T0 =  ', t0(i,j,k)
+               
+               
+               !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+               !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.0001 .and. n.lt.200)then
+               !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
+               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-7 .and. n.lt.500)then
+                  !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                  
+                  !write( *, * ) 'End of loop'
+                  go to 383
+                  !elseif(n.ge.200)then
+               elseif(n.ge.500)then
+                  write(*,*) qv_sat, qv_satOld
+                  !if(dowr) write(outfile,*) '  stuck in loop (111)! '
+                  if(dowr) write(outfile,*) '  stuck in moist loop1&
+                       & isnd=1005 Itteration problem here'
+                  call stopcm1
+               endif
+               
+               if (qc0(i,j,k).le.0.0) then
+                  
+                  write( *, * ) 'ERROR: No liquid created above z0'
+                  write( *, * ) 'itteration 1 at ', zh(i,j,k)
+                  write( *, * ) 'qc0 =  ', qc0(i,j,k)
+                  stop
+                  
+               endif
+
+               t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+
+               qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+               qv0(i,j,k) = qv_sat
+               qc0(i,j,k) = qt0(i,j,k) - qv_sat
+
+               
+               !th0(i,j,k) = t0(i,j,k)/pi0(i,j,k)
+               
+               do k=idx2+1,ke
+                  delz=zh(i,j,k)-zh(i,j,k-1)
+                  n = 1
+                  
+                  ! Note that pi, th, prs, and T are already set from
+                  ! marginal cloud
+                  
+                  qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+                  if (qt0(i,j,k).gt.qv_sat) then
+                     
+                     qv0(i,j,k) = qv_sat
+                     qc0(i,j,k) = qt0(i,j,k) - qv_sat
+                     
+                  else
+                     
+                     qv0(i,j,k) = qt0(i,j,k)
+                     qc0(i,j,k) = 0.0
+                     
+                  endif
+
+                  
+384               continue
+                  
+                  th0(i,j,k) = thl0(i,j,k)* &
+                       exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
+                  
+                  thr0(i,j,k) = th0(i,j,k)* &
+                       (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+                  
+                  
+                  ! Discretely step pressure forward (k=1)
+                  pi0(i,j,k)=pi0(i,j,k-1) - &
+                       g*delz/(cp*0.5*(thr0(i,j,k)+thr0(i,j,k-1)))
+                  
+                  ! Modify th0 if liquid is present
+                  !if (qc0(i,j,k).gt.0) then
+
+                  !end if
+
+                  ! Update pressure
+                  prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+
+                  ! Update tempreature
+                  T_Old = t0(i,j,k)
+                  t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+                  
+                  
+                  ! Update saturation mixing ratio
+                  qv_satOld = qv_sat
+                  qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+
+                  qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                  t0(i,j,k) = T_Old + 0.3*(t0(i,j,k)-T_Old)
+                  !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                  ! The line above is the bug fix for isnd.eq.1004.
+                  ! This line was orignally inside the if statement
+                  ! below containing the goto statement. Due to its
+                  ! location it had no effect on the itteration. Moving
+                  ! it here fixed the convergence issue with the warm
+                  ! cloud example.
+                  
+                  !if (qt0(i,j,k).gt.qv_sat) then
+                     
+                     qv0(i,j,k) = qv_sat
+                     qc0(i,j,k) = qt0(i,j,k) - qv_sat
+                     
+                  !else
+                     
+                  !   qv0(i,j,k) = qt0(i,j,k)
+                  !   qc0(i,j,k) = 0.0
+                     
+                  !endif
+                  
+                  !thr0(i,j,k) = th0(i,j,k)* &
+                  !     (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+                
+                  n=n+1
+
+                  ! write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
+                  !      'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
+                  !      'SC =  ', (qv_sat-qv_satOld)/qv_satOld, &
+                  !      'prs0 =  ', prs0(i,j,k), 'T0 =  ', t0(i,j,k)
+                  
+                  
+                  !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+                  !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.00001 .and. n.lt.200)then
+                  if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-7 .and. n.lt.500)then
+                     !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                     go to 384
+                  !elseif(n.ge.200)then
+                  elseif(n.ge.500)then
+                     !if(dowr) write(outfile,*) '  stuck in loop (111)! HERE'
+                     if(dowr) write(outfile,*) '  stuck in moist&
+                          &loop2 isnd=1004'
+                     call stopcm1
+                  endif
+
+                  if (qc0(i,j,k).le.0.0.and.k.lt.ke) then
+                     
+                     write( *, * ) 'ERROR: No liquid created above z0'
+                     write( *, * ) 'itteration 2 at ', zh(i,j,k)
+                     write( *, * ) 'qc0 =  ', qc0(i,j,k)
+                     stop
+                     
+                  endif
+
+                  !th0(i,j,k) = t0(i,j,k)/pi0(i,j,k)
+                  t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+                  
+                  qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+                  qv0(i,j,k) = qv_sat
+                  qc0(i,j,k) = qt0(i,j,k) - qv_sat
+
+                  
+                  
+               enddo
+            enddo
+         enddo
+
+         ! Integrate downward next.
+         ! Should be no liquid production below z_0. Algorithm
+         ! written assuming this
+
+         ! calcualete dz for first step
+         delz = zh(ib,jb,idx1) - MBM_hl
+         
+         do j=jb,je
+            do i=ib,ie
+               k = idx1
+               
+               thr0(i,j,k) = th0(i,j,k)* &
+                    (1 + reps*qt0(i,j,k))/(1 + qt0(i,j,k))
+
+               ! Discretely step pressure forward (k=idx-1)
+               pi0(i,j,k)=pi_0- &
+                    g*delz/(cp*0.5*(thr0(i,j,k)+thr_0))
+
+               ! no need to modify theta since no liquid
+               
+               ! Update pressure
+               prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+               
+               ! Update tempreature
+               t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+
+               qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+               
+               if (qt0(i,j,k).gt.qv_sat) then
+
+                  write( *, * ) 'ERROR: liquid created below z0'
+                  stop
+
+               else
+
+                  qv0(i,j,k) = qt0(i,j,k)
+                  qc0(i,j,k) = 0
+                  
+               endif
+               
+               do k= idx1-1, kb, -1
+                  delz=zh(i,j,k)-zh(i,j,k+1)
+                  
+                  thr0(i,j,k) = th0(i,j,k)* &
+                       (1 + reps*qt0(i,j,k))/(1 + qt0(i,j,k))
+
+                  ! Discretely step pressure forward
+                  pi0(i,j,k)=pi0(i,j,k+1) - &
+                       g*delz/(cp*0.5*(thr0(i,j,k)+thr0(i,j,k+1)))
+
+                  ! no need to modify theta since no liquid
+
+                  ! Update pressure
+                  prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+                  
+                  ! Update tempreature
+                  t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+
+                  qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+
+                  if (qt0(i,j,k).gt.qv_sat) then
+                     
+                     write( *, * ) 'ERROR: liquid created below z0'
+                     stop
+                     
+                  else
+                     
+                     qv0(i,j,k) = qt0(i,j,k)
+                     qc0(i,j,k) = 0.0
+                     
+                  endif
+                  
+               enddo
+            enddo
+         enddo
+         
+         
+         if(dowr) write(outfile,*)
+         
+         qsurf = cgs1*qv0(1,1,1)+cgs2*qv0(1,1,2)+cgs3*qv0(1,1,3) 
+
+
+!-----------------------------------------------------------------------
+!  isnd = 1006 (RPW)
+!
+!  MBM Critically saturated constant moist unsaturated BVF + perturbed 
+!  cloud layer (cloud over clear)
+!
+!  Integrate from cloud layer height z_0
+!
+!  Debug isnd=1004 for warm cloud
+!
+!  - double itteration idea
+!         
+!  Created for thesis results RPW -- June 2021 
+!
+         
+      ELSEIF(isnd.eq.1006)then
+         
+         if(dowr) write(outfile,*) '  isnd = 1006'
+         
+         ! Define Brunt-Vaisala frequency N^2
+         ns =  MBM_ns
+         
+         ! Define Surface conditions
+         th_sfc   =  MBM_thsfc
+         pi_sfc   =  MBM_pisfc
+         !-----
+         p_sfc=p00*(pi_sfc**(cp/rd))
+         t_sfc=th_sfc*pi_sfc
+         qv_sfc=rslf(p_sfc,t_sfc)
+         thv_sfc=th_sfc*(1.0+reps*qv_sfc)/(1.0+qv_sfc)
+
+         !---------------------------------------------------------
+         ! Determine critically saturated constant Nm^2 background
+         ! Same as isnd=1000
+         !---------------------------------------------------------
+
+         do kk=kb,ke
+            do jj=jb,je
+               do ii=ib,ie
+                  ! DEFINE \theta_v here for constant Nm^2 (unsaturated)
+                  thv0(ii,jj,kk) = thv_sfc*exp(ns/g*zh(ii,jj,kk));
+               enddo
+            enddo
+         enddo
+         
+         if(dowr) write(outfile,*)
+         do j=jb,je
+            do i=ib,ie
+               
+               !---------- do k=1 first ----------!
+               k=1
+               n=1
+
+               ! Discretely step pressure forward
+               pi0(i,j,k)=pi_sfc-g*zh(i,j,k)/(cp*0.5*(thv0(i,j,k)+thv_sfc))
+               prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+
+               ! Initial guess for moisture profile at zh(i,j,1)
+               qv0(i,j,k)=qv_sfc
+
+               ! Initial theta at zh(i,j,1)
+               th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+
+               ! Nonlinear-loop for theta
+221            continue
+               
+               ! Update tempreature
+               t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+               
+               ! Update moisture profile
+               qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+
+               ! Update Theta
+               thlast = th0(i,j,k)
+               th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+               
+               n=n+1
+               
+               if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
+               !if(abs(th0(i,j,k)-thlast).gt.0.0001 .and. n.lt.200)then
+               if(abs(th0(i,j,k)-thlast).gt.1E-4 .and. n.lt.500)then
+                  th0(i,j,k)=thlast+0.3*(th0(i,j,k)-thlast)
+                  go to 221
+               !elseif(n.ge.200)then
+               elseif(n.ge.500)then
+                  if(dowr) write(outfile,*) '  stuck in loop (112)!'
+                  call stopcm1
+               endif
+               
+               ! Update Temperature and moisture to match theta
+               t0(i,j,k)=th0(i,j,k)*pi0(i,j,k)
+               qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+               
+               if(qc0(i,j,1).lt.0.0)then
+                  print *,'  calling stopcm1 (222) '
+                  call stopcm1
+               endif
+               if(i.eq.1.and.j.eq.1.and.dowr) write(outfile,*) k,n,th0(i,j,k),prs0(i,j,k)
+
+               !---------- done with k=1, do all other levels ----------!
+               
+               !do k=2,nk
+               do k=2,ke
+                  
+                  n=1
+                  delz=zh(i,j,k)-zh(i,j,k-1)
+
+                  ! Discretely step pressure forward
+                  pi0(i,j,k)=pi0(i,j,k-1) - g*delz/(cp*0.5*(thv0(i,j,k)+thv0(i,j,k-1)))
+                  prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+                  
+                  ! Initial guess for moisture profile at zh(i,j,k)
+                  qv0(i,j,k)=qv0(i,j,k-1)
+                  
+                  ! Initial theta at zh(i,j,k)
+                  th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+                  
+                  ! Nonlinear-loop for theta
+222               continue
+                  
+                  ! Update tempreature
+                  t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+                  
+                  ! Update moisture profile
+                  qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+                  
+                  ! Update Theta
+                  thlast = th0(i,j,k)
+                  th0(i,j,k) = thv0(i,j,k)*(1 + qv0(i,j,k))/(1 + reps*qv0(i,j,k))
+                  
+                  n=n+1
+                  
+                  if(n.gt.180.and.dowr) write(outfile,*) n,prs0(i,j,k),thlast,th0(i,j,k),th0(i,j,k)-thlast
+                  !if(abs(th0(i,j,k)-thlast).gt.0.0005 .and. n.lt.200)then
+                  if(abs(th0(i,j,k)-thlast).gt.1E-4 .and. n.lt.500)then
+                     th0(i,j,k)=thlast+0.3*(th0(i,j,k)-thlast)
+                     go to 222
+                  !elseif(n.ge.200)then
+                  elseif(n.ge.500)then
+                     if(dowr) write(outfile,*) '  stuck in loop (333)!'
+                     print *,'  prs,thlast,thn = ',prs0(i,j,k),thlast,thn
+                     call stopcm1
+                  endif
+                  
+                  ! Update Temperature and moisture to match theta
+                  t0(i,j,k)=th0(i,j,k)*pi0(i,j,k)
+                  qv0(i,j,k)=rslf(prs0(i,j,k),t0(i,j,k))
+                  
+                  if(qc0(i,j,1).lt.0.0)then
+                     print *,'  calling stopcm1 (444) '
+                     call stopcm1
+                  endif
+
+                  if(i.eq.1.and.j.eq.1.and.dowr) write(outfile,*) k,n,t0(i,j,k),fliq,fice
+
+               enddo  ! enddo for k loop
+               
+            enddo  ! enddo for i loop
+
+         enddo  ! enddo for j loop
+
+         !---------------------------------------------------------
+         ! END
+         ! Determine critically saturated constant Nm^2 background
+         ! Same as isnd=1000
+         !---------------------------------------------------------
+
+         !---------------------------------------------------------
+         ! Perturb background to include cloud layer
+         !---------------------------------------------------------
+
+         ! Extract TIR Parameters 
+         UScale = MBM_UScale
+         mst_grad = MBM_alpha !moisture gradient (alpha)
+         !z_bot = MBM_zB !CCL bottom shift (very old obsolete feature)
+         
+         
+         ! Compute moisture scale (CCL)
+         mstScale = xlv/rv/MBM_T0*UScale/sqrt(cp*MBM_T0) ! var4 = T0 from CCL
+
+         !write( *, * ) 'Press Enter to continue alpha=', mst_grad 
+         !read( *, * )
+
+         ! Copy th_l0 for theta correction
+         thl0 = th0
+
+         ! Perturb moisture profile
+         do k=kb,ke
+            do j=jb,je
+               do i=ib,ie
+                  
+                  if(MBM_dim.eq.1)then
+                     zprime = (zh(i,j,k) - MBM_hl)/MBM_hl
+                  else
+                     HScale = MBM_HScale
+                     zprime = zh(i,j,k)/HScale + z_bot
+                  endif
+                  qv_pert = mstScale*mst_grad*zprime
+
+                  qt0(i,j,k) = qv0(i,j,k)*(1+qv_pert)
+
+               enddo
+            enddo
+         enddo
+
+         ! Find neighbouring nodes to z_0 (cloud height)
+         do k=kb,ke
+
+            z_find(k) = abs(zh(ib,jb,k) - MBM_hl)
+            
+         enddo
+         
+         ! First find closest index
+         ClstIdx = minloc(z_find,1)
+         
+         write( *, * ) 'index is ', ClstIdx, ' value is ', &
+              zh(ib,jb,ClstIdx), 'kb is', kb
+         
+         if (zh(ib,jb,ClstIdx).gt.MBM_hl) then
+
+            idx1 = ClstIdx - 1
+            idx2 = ClstIdx
+
+            write( *, * ) 'Bracketing values from minloc ', &
+                 zh(ib,jb,idx1), zh(ib,jb,idx2)
+            
+         elseif (zh(ib,jb,ClstIdx).lt.MBM_hl) then
+
+            idx1 = ClstIdx
+            idx2 = ClstIdx + 1
+
+            write( *, * ) 'Bracketing values from minloc ', &
+                 zh(ib,jb,idx1), zh(ib,jb,idx2)
+
+         elseif (zh(ib,jb,ClstIdx).eq.MBM_hl) then
+
+            write( *, * ) "ERROR: z0 is grid node. isnd=1004 & 
+                 &cloud layer"
+            stop
+      
+         else
+
+            write( *, * ) "ERROR: isnd=1004 can not proceed."
+            stop
+            
+         endif
+
+         k = kb
+         do while (zh(ib,jb,k).lt.MBM_hl)
+            k = k+1
+         enddo
+         
+         idx1 = k-1
+         idx2 = k
+
+         write( *, * ) 'Bracketing values from while ', &
+              zh(ib,jb,idx1), zh(ib,jb,idx2)
+         
+         ! Compute z0 level theta_rho for hydrostatic integration
+         qv_sat0=rslf(MBM_P0,MBM_T0)
+         ! if(MBM_dim.eq.1)then
+         !    qv_pert = mstScale*mst_grad*(-1)
+         ! else
+         !    qv_pert = mstScale*mst_grad*z_bot
+         ! endif
+
+         ! if (qv_pert.le.0) then
+         !    qv_sfc = qv_sat*(1+qv_pert)
+         !    qc_sfc = 0.0
+         !    qt_sfc = qv_sfc
+         ! else
+         !    qv_sfc = qv_sat
+         !    qc_sfc = qv_sat*qv_pert
+         !    qt_sfc = qv_sfc + qc_sfc
+         ! end if
+
+         pi_0 = (MBM_P0/p00)**(rd/cp)
+         th_0 = MBM_T0/pi_0
+         
+         !thr_0 = th_0*(1.0+reps*qv_sfc)/(1.0+qt_sfc)
+         thr_0 = th_0*(1.0+reps*qv_sat0)/(1.0+qv_sat0)
+
+         ! Itteration starts with initial guess for pi and
+         ! theta at the current level.
+         !
+         ! The initial guess is taken to be the values from
+         ! marginal cloud portion.
+         !
+         ! Using these T, P, rSat, rv, rl, and th_rho are computed.
+         !
+         ! Note that T and P are already computed from marginal cloud
+         ! values
+         !
+         ! Itteration begins with computing updated pi and theta.
+
+         ! calcualete dz for first step
+         delz = zh(ib,jb,idx2) - MBM_hl
+         
+         ! nonlinear itteration
+         ! Integrate upward first
+         do j=jb,je
+            do i=ib,ie               
+               k = idx2
+               n = 1
+
+               ! Note that pi, th, prs, and T are already set from
+               ! marginal cloud
+               
+               qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+               if (qt0(i,j,k).gt.qv_sat) then
+
                   qv0(i,j,k) = qv_sat
                   qc0(i,j,k) = qt0(i,j,k) - qv_sat
                   
@@ -2219,24 +2799,107 @@
                   qc0(i,j,k) = 0.0
                   
                endif
+
+               write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
+                    'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
+                    'th0 =  ', th0(i,j,k), &
+                    'prs0 =  ', prs0(i,j,k), 'T0 =  ', t0(i,j,k)
+               
+               ncount = 1;
+223            continue
+               
+               th0(i,j,k) = thl0(i,j,k)* &
+                    exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
+               
                
                thr0(i,j,k) = th0(i,j,k)* &
                     (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
 
+               
+               ! Discretely step pressure forward (k=idx+1)
+               !pi0(i,j,k)=pi_0- &
+               !     g*delz/(cp*0.5*(thr0(i,j,k)+thr_0))
+
+               pi0(i,j,k)=pi_0- &
+                    g*delz/(2*cp)*(1/thr0(i,j,k) + 1/thr_0)
+               pitst=pi_0- &
+                    g*delz/(cp*0.5*(thv0(i,j,k)+thr_0))
+               
+
+               ! Update pressure
+               prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
+
+               ! Update tempreature
+               T_Old = t0(i,j,k)
+               t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
+
+               ncount = ncount + 1
+
+               !write( *, * ) 'ncount =  ', ncount
+               
+               if(abs((t0(i,j,k)-T_Old)/T_Old).gt.1E-6 &
+                    .and. ncount.lt.500)then
+
+                  go to 223
+
+               elseif(ncount.ge.500)then
+
+                  if(dowr) write(outfile,*) '  stuck in interior loop1&
+                       &isnd=1005'
+                  call stopcm1
+               endif
+               ncount = 1;
+               
+               ! Update saturation mixing ratio
+               qv_satOld = qv_sat
+               qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
+               !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+               ! The line above is the bug fix for isnd.eq.1004.
+               ! This line was orignally inside the if statement
+               ! below containing the goto statement. Due to its
+               ! location it had no effect on the itteration. Moving
+               ! it here fixed the convergence issue with the cloud
+               ! layer base state for the warm cloud example.
+               
+               
+               !write( *, * ) 'In loop'
+               !write( *, * ) 'qv_sat =  ', qv_sat, &
+               !     'qt0 =  ', qt0(i,j,k), &
+               !     'tst =  ', qt0(i,j,k).gt.qv_sat
+               
+               !if (qt0(i,j,k).gt.qv_sat) then
+               !if ((qt0(i,j,k) - qv_sat).gt.0.0) then
+                  
+                  qv0(i,j,k) = qv_sat
+                  qc0(i,j,k) = qt0(i,j,k) - qv_sat
+                  
+               !else
+                  
+               !   qv0(i,j,k) = qt0(i,j,k)
+               !   qc0(i,j,k) = 0.0
+                  
+               !endif
+               
+               !thr0(i,j,k) = th0(i,j,k)* &
+               !     (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+
                n=n+1
 
+               write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
+                    'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
+                    'th0 =  ', th0(i,j,k), &
+                    'prs0 =  ', prs0(i,j,k), 'T0 =  ', t0(i,j,k)
+               
+               
                !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
                !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.0001 .and. n.lt.200)then
                !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
-               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-5 .and. n.lt.500)then
+               if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
                   !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
-
+                  
                   !write( *, * ) 'End of loop'
-                  !write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
-                  !     'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
-                  !     'tst =  ', qt0(i,j,k).gt.qv_sat
-                  go to 383
-               !elseif(n.ge.200)then
+                  go to 223
+                  !elseif(n.ge.200)then
                elseif(n.ge.500)then
                   write(*,*) qv_sat, qv_satOld
                   !if(dowr) write(outfile,*) '  stuck in loop (111)! '
@@ -2253,12 +2916,13 @@
                   stop
                   
                endif
-
+               
+               !th0(i,j,k) = t0(i,j,k)/pi0(i,j,k)
                
                do k=idx2+1,ke
                   delz=zh(i,j,k)-zh(i,j,k-1)
                   n = 1
-
+                  
                   ! Note that pi, th, prs, and T are already set from
                   ! marginal cloud
                   
@@ -2275,31 +2939,52 @@
                      
                   endif
                   
+                  ncount = 1
+224               continue
+                  
+                  th0(i,j,k) = thl0(i,j,k)* &
+                       exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
+                  
                   thr0(i,j,k) = th0(i,j,k)* &
                        (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
                   
-384               continue
                   
                   ! Discretely step pressure forward (k=1)
                   pi0(i,j,k)=pi0(i,j,k-1) - &
                        g*delz/(cp*0.5*(thr0(i,j,k)+thr0(i,j,k-1)))
                   
                   ! Modify th0 if liquid is present
-                  if (qc0(i,j,k).gt.0) then
-                     th0(i,j,k) = thl0(i,j,k)* &
-                          exp((xlv/cp)*(qc0(i,j,k)/t0(i,j,k)))
-                  end if
+                  !if (qc0(i,j,k).gt.0) then
+
+                  !end if
 
                   ! Update pressure
                   prs0(i,j,k)=p00*(pi0(i,j,k)**(cp/rd))
 
                   ! Update tempreature
+                  T_Old = t0(i,j,k)
                   t0(i,j,k) = th0(i,j,k)*pi0(i,j,k)
 
+                  ncount = ncount + 1
+                  if(abs((t0(i,j,k)-T_Old)/T_Old).gt.1E-6 &
+                       .and. ncount.lt.500)then
+                     
+                     go to 224
+                     
+                  elseif(ncount.ge.500)then
+                     
+                     if(dowr) write(outfile,*) '  stuck in interior loop2&
+                          &isnd=1005'
+                     call stopcm1
+                  endif
+                  ncount = 1;
+
+                  
                   ! Update saturation mixing ratio
                   qv_satOld = qv_sat
                   qv_sat = rslf(prs0(i,j,k),t0(i,j,k))
-                  qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                  !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
+                  !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
                   ! The line above is the bug fix for isnd.eq.1004.
                   ! This line was orignally inside the if statement
                   ! below containing the goto statement. Due to its
@@ -2307,30 +2992,36 @@
                   ! it here fixed the convergence issue with the warm
                   ! cloud example.
                   
-                  if (qt0(i,j,k).gt.qv_sat) then
+                  !if (qt0(i,j,k).gt.qv_sat) then
                      
                      qv0(i,j,k) = qv_sat
                      qc0(i,j,k) = qt0(i,j,k) - qv_sat
                      
-                  else
+                  !else
                      
-                     qv0(i,j,k) = qt0(i,j,k)
-                     qc0(i,j,k) = 0.0
+                  !   qv0(i,j,k) = qt0(i,j,k)
+                  !   qc0(i,j,k) = 0.0
                      
-                  endif
+                  !endif
                   
-                  thr0(i,j,k) = th0(i,j,k)* &
-                       (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
+                  !thr0(i,j,k) = th0(i,j,k)* &
+                  !     (1 + reps*qv0(i,j,k))/(1 + qt0(i,j,k))
                 
                   n=n+1
+
+                  ! write( *, * ) 'n =  ', n, 'qv_sat =  ', qv_sat, &
+                  !      'qc0 =  ', qc0(i,j,k), 'qt0 =  ', qt0(i,j,k), &
+                  !      'SC =  ', (qv_sat-qv_satOld)/qv_satOld, &
+                  !      'prs0 =  ', prs0(i,j,k), 'T0 =  ', t0(i,j,k)
+                  
                   
                   !if(n.gt.180.and.dowr) write(outfile,*) n,th0(i,j,k)
                   !if(abs((qv_sat-qv_satOld)/qv_satOld).gt.0.00001 .and. n.lt.200)then
-                  if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-5 .and. n.lt.5000)then
+                  if(abs((qv_sat-qv_satOld)/qv_satOld).gt.1E-6 .and. n.lt.500)then
                      !qv_sat=qv_satOld+0.3*(qv_sat-qv_satOld)
-                     go to 384
+                     go to 224
                   !elseif(n.ge.200)then
-                  elseif(n.ge.5000)then
+                  elseif(n.ge.500)then
                      !if(dowr) write(outfile,*) '  stuck in loop (111)! HERE'
                      if(dowr) write(outfile,*) '  stuck in moist&
                           &loop2 isnd=1004'
@@ -2345,6 +3036,8 @@
                      stop
                      
                   endif
+
+                  th0(i,j,k) = t0(i,j,k)/pi0(i,j,k)
                   
                enddo
             enddo
