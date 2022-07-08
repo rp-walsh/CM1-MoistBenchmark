@@ -192,6 +192,7 @@
       real :: thlpclr, rtpclr, rttclr, rthpclr, rsat_old, rsat_new
       real :: rsat_oldold, cyclcount
       real :: thlb_zNSMR, rTb_zNSMR
+      real :: qlinterp
       integer :: ncount
       real, dimension(ib:ie,jb:je,kb:ke) :: rlindctr, rtcld, rtclr
       real, dimension(ib:ie,jb:je,kb:ke) :: thltcld, thltclr
@@ -450,7 +451,7 @@
              iinit.eq.1002.or.iinit.eq.1003.or.iinit.eq.1004.or. &
              iinit.eq.1005.or.iinit.eq.1006.or.iinit.eq.1007.or. &
              iinit.eq.1008.or.iinit.eq.1009.or.iinit.eq.1010.or. &
-             iinit.eq.1012)THEN
+             iinit.eq.1012.or.iinit.eq.1013.or.iinit.eq.1014)THEN
            
            !-----------------------------------------------------------------------
            ! The leading order cloud layer for the TIR benchmark has been placed in
@@ -3824,9 +3825,11 @@
 !-----------------------------------------------------------------------
 !     iinit = 1012 (RPW)
 !
-!     Originally a copy of iinit 1010. This initialization is creteated
-!     to incooporate the newly calculated non-SMR coefficients into my
-!     thesis setup and runs
+!     Originally a copy of iinit 1010 (note that 1011 was used
+!     previously in a completely different context and was therefore
+!     skipped in this sequence of improvements). This initialization is
+!     creteated to incooporate the newly calculated non-SMR coefficients
+!     into my thesis setup and runs
 !     
 !       
 !     Thesis initialization. Initialize liquid/vapor perturbations
@@ -4244,6 +4247,974 @@
                    
                 endif
 
+                ! This was original
+                wa(i,j,k) = uScale*psip_x
+                !wa(i,j,k) = 0.0
+
+                
+             enddo
+          enddo
+       enddo
+              
+       
+       call bcu(ua)
+       call bcw(wa,1)       
+
+!-----------------------------------------------------------------------
+!     iinit = 1013 (RPW)
+!     
+!     Originally a copy of iinit 1012. This initialization was created
+!     to fix the w initialization near the interface. New update is to
+!     extrapolate the ql function linearly to determine which side of
+!     the cloud edge interface the w points lie on
+!
+!     This initialization incooporates the non-SMR coefficients into
+!     my thesis setup and runs. These coefficients are currently hard
+!     coded.
+!     
+!     Thesis initialization. Initialize liquid/vapor perturbations
+!     using itteration through cm1 constituative laws.
+!     
+!     This initialization uses the initialization of iinit=1009 as an
+!     initial guess for the itteration. It then uses T=(th0+thpert)*pi0
+!     and rstar = rslf(T,prs0) to determine the saturation mixing ratio
+!     to start the run in thermodynamic equlibrium.
+!     
+       
+    ELSEIF(iinit.eq.1013)THEN
+       
+       
+       ! Extract parameter from input file
+       
+       Ht = MBM_Ht ! dimensional
+       Hl = MBM_hl ! dimensional
+       mClear = MBM_mClear ! dimensionless
+       mCloud = MBM_mCloud ! dimensionless
+       kwv = MBM_kwv ! dimensionless
+       om = MBM_omega ! dimensionless
+       ns = MBM_ns ! dimensional value becuase this is what's used
+                   ! for background
+       ncs = 0.0001276000 ! dimensional
+       !ncs = 1.1053844e-04
+       T0 = MBM_T0
+       P0 = MBM_P0
+       r0 = var1
+       uScale = MBM_UScale
+       alpha = MBM_alpha
+       delta = MBM_epsW ! dimensionless delta
+       
+       
+       ! Calculate solution scales
+       
+       H0 = rd*T0/g
+       tau = sqrt(cp*T0)/g
+       
+       epsb = Hl/H0*rd/cp
+       epsv = Hl/H0*rv*T0/xlv
+       mu = uScale*tau/Hl
+
+       thlb_zNSMR = 2.1509107e-5
+       rTb_zNSMR = -1.9244379610420476e-4
+       
+       ! Calculate solutuon parameters
+       
+       nbs = tau**2*ns ! dimensionless clear bv frequency
+       nbcs = tau**2*ncs ! dimensionless cloud bv frequency
+       Gambar = 1 - nbs ! dimensionless Gamma
+       Rbar0 = Gambar - epsv/epsb ! dimensionless Rbar
+       Lambda = (xlv/T0)**2*r0/cp/rv ! dimensionless latent heat
+
+       cps = om/kwv ! dimensionless phase speed
+
+       ! this value is hard coded for now to check the nm fix
+       nbcs4coeff = 0.3039077
+       PsiCoef = delta*Lambda/(1 + Lambda)*alpha*cps/(nbs-0.3039077)
+
+
+       ! display paramters to screen output
+       
+       write( *, * ) 'isnd = 1012 parameters:'
+       write( *, * ) 'ns = ', ns, 'ncs = ', ncs 
+       write( *, * ) 'T0 = ', T0, 'P0 = ', P0, 'r0 = ', r0
+       write( *, * ) 'nbs = ', nbs, 'nbcs = ', nbcs, &
+            'Gammabar0 = ', Gambar
+       write( *, * ) 'Rbar0 = ', Rbar0, 'LambdaBar0 = ', Lambda
+       write( *, * ) 'eps = ', epsb, 'uScale = ', uScale, &
+            'mu = ', mu
+       write( *, * ) 'eps tst = ', eps
+       write( *, * ) 'tau = ', tau
+       write( *, * ) 'k = ', kwv, 'mClear', mClear, &
+            'mCloud = ', mCloud
+       write( *, * ) 'c = ', cps, 'omega = ', om
+       write( *, * ) 'cp = ', cp, 'g = ', g
+       write( *, * ) 'PsiCoef = ', PsiCoef, 'delta = ', delta
+       !read( *, * )
+
+
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+                   
+                psipcld = PsiCoef* &
+                     sinh(mCloud/Hl*(zh(i,j,k)-Ht))/ &
+                     sinh(mCloud/Hl*(Hl - Ht))*cos(kwv/Hl*xh(i))
+
+                psipclr = PsiCoef*sin(mClear/Hl*zh(i,j,k))/ &
+                     sin(mClear)*cos(kwv/Hl*xh(i)) 
+
+
+                ! Define total water variables in cloud
+
+                rtpcld = -Rbar0/cps*psipcld ! r_T'
+                !rttcld = xlv/rv/T0*mu*epsb*rtpcld ! \tilde{r}_T
+                rttcld = mu*Hl*rTb_zNSMR*(rtpcld/(-Rbar0)) ! \tilde{r}_T
+                rthpcld = qvSat(i,j,k)*rttcld ! \hat{r}_T'
+                ! total r_T
+                rtcld(i,j,k) = qv0(i,j,k) + qc0(i,j,k) + rthpcld
+
+
+                ! Define total water variables in clear
+                
+                rtpclr = -Rbar0/cps*psipclr ! r_T'
+                rttclr = mu*Hl*rTb_zNSMR*(rtpclr/(-Rbar0)) ! \tilde{r}_T
+                rthpclr = qvSat(i,j,k)*rttclr ! \hat{r}_T'
+                ! total r_T
+                rtclr(i,j,k) = qv0(i,j,k) + qc0(i,j,k) + rthpclr
+
+
+                ! Define \tilde{theta}_l variable in cloud
+                
+                thlpcld = nbs/cps*psipcld ! \theta_l'
+                !thltcld(i,j,k) = mu*epsb*thlpcld ! \tilde{\theta}_l
+                thltcld(i,j,k) = mu*Hl*thlb_zNSMR*(thlpcld/nbs) ! \tilde{\theta}_l
+
+                ! Define \tilde{theta}_l variable in clear
+                
+                thlpclr = nbs/cps*psipclr ! \theta_l'
+                !thltclr(i,j,k) = mu*epsb*thlpclr ! \tilde{\theta}_l
+                thltclr(i,j,k) = mu*Hl*thlb_zNSMR*(thlpclr/nbs) ! \tilde{\theta}_l
+                
+                if(zh(i,j,k).lt.Hl)then
+                   
+                   rlp = 1/(1+Lambda)*(rtpcld - thlpcld) + &
+                        1/(1+Lambda)*alpha/Hl*(zh(i,j,k) - Hl) ! r_l'
+                   
+                else ! in cloud region
+                   
+                   rlp = 1/(1+Lambda)*(rtpcld - thlpcld) ! r_l'
+                   
+                endif
+                
+                rlt = xlv/rv/T0*mu*epsb*rlp ! \tilde{r}_l
+                rlhp =  qvSat(i,j,k)*rlt ! \hat{r}_l'
+             
+                ! define liquid water indicator function (note this
+                ! functions is less than 0 where no cloud exists)
+                rlindctr(i,j,k) = qc0(i,j,k) + rlhp             
+                
+             enddo
+          enddo
+       enddo
+          
+       ! initialize scalar fields (xh,yh,zh locations)
+
+       !do j=jb,je
+       !   do i=ib,ie         
+       !      do k=kb,ke
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+
+
+                ! define psi'
+                if (rlindctr(i,j,k).le.0.0) then ! in clear region
+
+                   psip = PsiCoef*sin(mClear/Hl*zh(i,j,k))/ &
+                        sin(mClear)*cos(kwv/Hl*xh(i)) 
+                        
+                   
+                else ! in cloud region
+
+                   psip = PsiCoef* &
+                        sinh(mCloud/Hl*(zh(i,j,k)-Ht))/ &
+                        sinh(mCloud/Hl*(Hl - Ht))*cos(kwv/Hl*xh(i))
+                   
+                endif
+
+                
+                ! define boussinesq total water content perturbation
+                rtp = -Rbar0/cps*psip ! r_T'
+                rtt = mu*Hl*rTb_zNSMR*(rtp/(-Rbar0)) ! \tilde{r}_T
+                rthp = qvSat(i,j,k)*rtt ! \hat{r}_T'
+                rt = qv0(i,j,k) + qc0(i,j,k) + rthp ! total r_T
+
+
+                ! define boussinesq liquid water potential
+                ! temperature perturbation
+                thlp = nbs/cps*psip ! \theta_l'
+                !thlt = mu*epsb*thlp ! \tilde{\theta}_l
+                thlt = mu*Hl*thlb_zNSMR*(thlp/nbs) ! \tilde{\theta}_l
+
+                ! Fix rl kink by adding to rlp. This should fix the
+                ! theta initialization too in the cloud region.
+                ! Temperature cares about the rlp. This is missed
+                ! when added to qc as in the next code block.
+
+                   
+                ! define boussinesq liquid water mixing ratio
+                ! perturbation for temperature pertutbation
+                if (rlindctr(i,j,k).le.0.0) then ! in clear region
+                   
+                   rlp = 0 ! r_l'
+                   
+                   ! In cloud where interface is displaced downward
+                elseif(rlindctr(i,j,k).gt.0.0.and.zh(i,j,k).lt.Hl)then
+                   
+                   rlp = 1/(1+Lambda)*(rtp - thlp) + &
+                        1/(1+Lambda)*alpha/Hl*(zh(i,j,k) - Hl) ! r_l'
+                   
+                else ! in cloud region
+                   
+                   rlp = 1/(1+Lambda)*(rtp - thlp) ! r_l'
+                   
+                endif
+                
+                rlt = xlv/rv/T0*mu*epsb*rlp ! \tilde{r}_l
+                rlhp =  qvSat(i,j,k)*rlt ! \hat{r}_l'
+                
+                
+                ! define cm1 liquid/vapour mixing ratio from
+                ! Boussinesq
+                if(rlindctr(i,j,k).le.0.0)then ! in clear region
+                   
+                   
+                   qa(i,j,k,nqv) = rt
+                   qa(i,j,k,nqc) = 0.0
+                   
+                   
+                else ! in cloud region
+                   
+                   
+                   qa(i,j,k,nqc) = qc0(i,j,k) + rlhp
+                   qa(i,j,k,nqv) = rt - qa(i,j,k,nqc)
+                   
+                   
+                endif
+                
+                
+                ! define boussinesq temperature perturbation
+                Tp = thlp + Lambda*rlp ! T'
+                Tt = mu*epsb*Tp ! \tilde{T}
+                Thp = tSat(i,j,k)*Tt ! \hat{T}'
+                Th = th0(i,j,k)*pi0(i,j,k) ! \hat{T}
+                T = Th + Thp ! total T
+                
+                
+                ! define cm1 potential temperature perturbation
+                !tha(i,j,k) = th0(i,j,k)*((1+thlt)* &
+                !     exp(xlv/cp*qa(i,j,k,nqc)/T)/ &
+                !     exp(xlv/cp*qc0(i,j,k)/Th) - 1)
+                
+                tha(i,j,k) = th0(i,j,k)*((1+thlt)* &
+                     exp(-xlv/cp*(qc0(i,j,k)/Th - qa(i,j,k,nqc)/T)) - 1)
+                            
+                
+                ! end scalar field Boussinesq initialization
+                ! (qv,ql,theta) for initial guess
+                
+                ! Begin itteration for thermodynamic consistency.
+                ! Only itterate through cloud equations to avoid
+                ! cycles. Negitive cloud water is generated indicates
+                ! clear conditions to be fixed at stopping criteria
+
+                if(zh(i,j,k).ge.Hl*(1-2*delta))then
+                   ncount = 0;
+                   cyclcount = 0;
+                   rsat_oldold = 0;
+                   rsat_old = rslf(prs0(i,j,k),Th)
+                   do
+                      ncount = ncount + 1
+                      
+                      T = (th0(i,j,k) + tha(i,j,k))*pi0(i,j,k)
+                      
+                      rsat_new = rslf(prs0(i,j,k),T)
+                      
+                      ! Cloud equations
+                      
+                      qa(i,j,k,nqv) = rsat_new
+                      qa(i,j,k,nqc) = rtcld(i,j,k) - rsat_new
+                      
+                      tha(i,j,k) = th0(i,j,k)*((1+thltcld(i,j,k))* &
+                           exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                           qa(i,j,k,nqc)/T)) - 1)
+                      
+                      
+                      ! Stopping criteria
+                      ! 1e-5 is currently the best I can do.
+                      if(abs((rsat_new - rsat_old)/rsat_new).lt.1e-5)then
+                         
+                         ! write(*,*) 'converged at'
+                         ! write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
+                         !      'itterations =', ncount
+                         
+                         ! fix to clear for negative cloud water
+                         if(qa(i,j,k,nqc).lt.0.0)then
+                            
+                            qa(i,j,k,nqv) = rtclr(i,j,k)
+                            qa(i,j,k,nqc) = 0.0
+                            
+                            tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
+                                 exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                                 qa(i,j,k,nqc)/T)) - 1)
+                            
+                         endif
+                         
+                         exit
+                         
+                         ! elseif(ncount.gt.500.and. &
+                         !      rsat_oldold.eq.rsat_new.and. &
+                         !      qa(i,j,k,nqc).lt.0.0)then
+                         
+                         !    write(*,*) '2-cycle found in clear skipping'
+                         !    write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
+                         !         'itterations =', ncount
+                         
+                         !    exit
+                         
+                         
+                      elseif(ncount.gt.500)then
+                         
+                         write(*,*) 'iinit 1010 itteration did not &
+                              &converge'
+                         write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
+                              'itterations =', ncount
+                         write(*,*) 'rsat_oldold', rsat_oldold, &
+                              'rsat_old', rsat_old, &
+                              'rsat_new', rsat_new
+                         
+                         stop
+                         
+                      else
+                         
+                         ! if(xh(i).eq.-2851.23340.and. &
+                         !      zh(i,j,k).eq.2229.16650)then
+                         !    write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
+                         !         'ncount=',ncount
+                         !    write(*,*) 'rsat_old', rsat_old, &
+                         !         'rsat_new', rsat_new
+                         !    write(*,*) 'liquid=', qa(i,j,k,nqc)
+                         
+                         ! endif
+                         
+                         rsat_oldold = rsat_old
+                         rsat_old = rsat_new
+                         
+                      endif
+                      
+                   enddo ! itteration end do
+
+                else
+
+                   qa(i,j,k,nqv) = rtclr(i,j,k)
+                   qa(i,j,k,nqc) = 0.0
+                   
+                   tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
+                        exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                        qa(i,j,k,nqc)/T)) - 1)
+                   
+                endif
+
+             enddo ! end j
+          enddo ! end i
+       enddo ! end k
+
+
+       ! initialize u field (xf,yh,zh locations)
+
+       !do k=kb,ke
+       !   do j=jb,je
+       !      do i=ib,ie+1
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+
+
+                ! define psi'_z
+                if (qa(i,j,k,nqc).gt.0.0) then ! in cloud region
+                   
+                   psip_z = PsiCoef* &
+                        mCloud*cosh(mCloud/Hl*(zh(i,j,k)-Ht))/ &
+                        sinh(mCloud/Hl*(Hl - Ht))*cos(kwv/Hl*xf(i))
+
+                   
+                else ! in clear region
+
+                   psip_z = PsiCoef*mClear*cos(mClear/Hl*zh(i,j,k))/ &
+                        sin(mClear)*cos(kwv/Hl*xf(i)) 
+                   
+                endif
+
+                ! This was original
+                ua(i,j,k) = -uScale*psip_z ! \hat{u}
+                !ua(i,j,k) = 0.0 ! \hat{u}
+                
+             enddo
+          enddo
+       enddo
+
+
+       ! initialize w field (xh,yh,zf locations)
+
+       !do k=kb,ke+1
+       !   do j=jb,je
+       !      do i=ib,ie         
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+
+
+                if (k.gt.1.and.qa(i,j,k,nqc).gt.0.and. &
+                     qa(i,j,k-1,nqc).le.0.0) then
+
+                   ! Extrapolate ql linearly to zf(i,j,k) using values
+                   ! at zh(i,j,k) and zh(i,j,k+1)
+                   qlinterp = ((qa(i,j,k+1,nqc) - qa(i,j,k,nqc))/dz)* &
+                        (zf(i,j,k) - zh(i,j,k)) + qa(i,j,k,nqc)
+                   
+                   ! define psi'_x
+                   if (qlinterp.gt.0.0) then ! in cloud region
+                      
+                      psip_x = -kwv*PsiCoef* &
+                           sinh(mCloud/Hl*(zf(i,j,k)-Ht))/ &
+                           sinh(mCloud/Hl*(Hl - Ht))*sin(kwv/Hl*xh(i)) 
+                      
+                   else ! in clear region
+                      
+                      psip_x = -kwv*PsiCoef*sin(mClear/Hl*zf(i,j,k))/ &
+                           sin(mClear)*sin(kwv/Hl*xh(i)) 
+                      
+                   endif
+                   
+                   ! write( *, * ) 
+                   ! write( *, * ) 
+                   ! write( *, * ) 'i = ', i, 'j = ', j, 'k = ', k
+                   ! write( *, * ) 'zf = ', zf(i,j,k), 'zh = ', zh(i,j,k)
+                   ! write( *, * ) 'zhijk = ' , zh(i,j,k), &
+                   !      'zhijk-1 = ' , zh(i,j,k-1)
+                   ! write( *, * ) 'qak+1 = ', qa(i,j,k+1,nqc), &
+                   !      'qak = ', qa(i,j,k,nqc), &
+                   !      'qak-1/2 = ', qlinterp, &
+                   !      'qak-1 = ', qa(i,j,k-1,nqc)
+                   ! write( *, * ) 'dz = ', dz
+                   ! write( *, * )
+                   ! write( *, * )
+                   ! read( *, * ) 
+                   
+
+                   
+                else
+                   
+                   
+                   ! define psi'_x
+                   if (qa(i,j,k,nqc).gt.0.0) then ! in cloud region
+                      
+                      psip_x = -kwv*PsiCoef* &
+                           sinh(mCloud/Hl*(zf(i,j,k)-Ht))/ &
+                           sinh(mCloud/Hl*(Hl - Ht))*sin(kwv/Hl*xh(i)) 
+                      
+                   else ! in clear region
+                      
+                      psip_x = -kwv*PsiCoef*sin(mClear/Hl*zf(i,j,k))/ &
+                           sin(mClear)*sin(kwv/Hl*xh(i)) 
+                      
+                   endif
+                   
+                endif
+                
+                ! This was original
+                wa(i,j,k) = uScale*psip_x
+                !wa(i,j,k) = 0.0
+
+                
+             enddo
+          enddo
+       enddo
+              
+       
+       call bcu(ua)
+       call bcw(wa,1)       
+
+!-----------------------------------------------------------------------
+!     iinit = 1014 (RPW)
+!     
+!     Originally a copy of iinit 1013. This initialization was created
+!     to fix the w initialization near the interface. New update is to
+!     initialize w and u at the flat cloud edge location for continuous
+!     initialization 
+!
+!     This initialization incooporates the non-SMR coefficients into
+!     my thesis setup and runs. These coefficients are currently hard
+!     coded.
+!     
+!     Thesis initialization. Initialize liquid/vapor perturbations
+!     using itteration through cm1 constituative laws.
+!     
+!     This initialization uses the initialization of iinit=1009 as an
+!     initial guess for the itteration. It then uses T=(th0+thpert)*pi0
+!     and rstar = rslf(T,prs0) to determine the saturation mixing ratio
+!     to start the run in thermodynamic equlibrium.
+!     
+       
+    ELSEIF(iinit.eq.1014)THEN
+       
+       
+       ! Extract parameter from input file
+       
+       Ht = MBM_Ht ! dimensional
+       Hl = MBM_hl ! dimensional
+       mClear = MBM_mClear ! dimensionless
+       mCloud = MBM_mCloud ! dimensionless
+       kwv = MBM_kwv ! dimensionless
+       om = MBM_omega ! dimensionless
+       ns = MBM_ns ! dimensional value becuase this is what's used
+                   ! for background
+       ncs = 0.0001276000 ! dimensional
+       !ncs = 1.1053844e-04
+       T0 = MBM_T0
+       P0 = MBM_P0
+       r0 = var1
+       uScale = MBM_UScale
+       alpha = MBM_alpha
+       delta = MBM_epsW ! dimensionless delta
+       
+       
+       ! Calculate solution scales
+       
+       H0 = rd*T0/g
+       tau = sqrt(cp*T0)/g
+       
+       epsb = Hl/H0*rd/cp
+       epsv = Hl/H0*rv*T0/xlv
+       mu = uScale*tau/Hl
+
+       thlb_zNSMR = 2.1509107e-5
+       rTb_zNSMR = -1.9244379610420476e-4
+       
+       ! Calculate solutuon parameters
+       
+       nbs = tau**2*ns ! dimensionless clear bv frequency
+       nbcs = tau**2*ncs ! dimensionless cloud bv frequency
+       Gambar = 1 - nbs ! dimensionless Gamma
+       Rbar0 = Gambar - epsv/epsb ! dimensionless Rbar
+       Lambda = (xlv/T0)**2*r0/cp/rv ! dimensionless latent heat
+
+       cps = om/kwv ! dimensionless phase speed
+
+       ! this value is hard coded for now to check the nm fix
+       nbcs4coeff = 0.3039077
+       PsiCoef = delta*Lambda/(1 + Lambda)*alpha*cps/(nbs-0.3039077)
+
+
+       ! display paramters to screen output
+       
+       write( *, * ) 'isnd = 1012 parameters:'
+       write( *, * ) 'ns = ', ns, 'ncs = ', ncs 
+       write( *, * ) 'T0 = ', T0, 'P0 = ', P0, 'r0 = ', r0
+       write( *, * ) 'nbs = ', nbs, 'nbcs = ', nbcs, &
+            'Gammabar0 = ', Gambar
+       write( *, * ) 'Rbar0 = ', Rbar0, 'LambdaBar0 = ', Lambda
+       write( *, * ) 'eps = ', epsb, 'uScale = ', uScale, &
+            'mu = ', mu
+       write( *, * ) 'eps tst = ', eps
+       write( *, * ) 'tau = ', tau
+       write( *, * ) 'k = ', kwv, 'mClear', mClear, &
+            'mCloud = ', mCloud
+       write( *, * ) 'c = ', cps, 'omega = ', om
+       write( *, * ) 'cp = ', cp, 'g = ', g
+       write( *, * ) 'PsiCoef = ', PsiCoef, 'delta = ', delta
+       !read( *, * )
+
+
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+                   
+                psipcld = PsiCoef* &
+                     sinh(mCloud/Hl*(zh(i,j,k)-Ht))/ &
+                     sinh(mCloud/Hl*(Hl - Ht))*cos(kwv/Hl*xh(i))
+
+                psipclr = PsiCoef*sin(mClear/Hl*zh(i,j,k))/ &
+                     sin(mClear)*cos(kwv/Hl*xh(i)) 
+
+
+                ! Define total water variables in cloud
+
+                rtpcld = -Rbar0/cps*psipcld ! r_T'
+                !rttcld = xlv/rv/T0*mu*epsb*rtpcld ! \tilde{r}_T
+                rttcld = mu*Hl*rTb_zNSMR*(rtpcld/(-Rbar0)) ! \tilde{r}_T
+                rthpcld = qvSat(i,j,k)*rttcld ! \hat{r}_T'
+                ! total r_T
+                rtcld(i,j,k) = qv0(i,j,k) + qc0(i,j,k) + rthpcld
+
+
+                ! Define total water variables in clear
+                
+                rtpclr = -Rbar0/cps*psipclr ! r_T'
+                rttclr = mu*Hl*rTb_zNSMR*(rtpclr/(-Rbar0)) ! \tilde{r}_T
+                rthpclr = qvSat(i,j,k)*rttclr ! \hat{r}_T'
+                ! total r_T
+                rtclr(i,j,k) = qv0(i,j,k) + qc0(i,j,k) + rthpclr
+
+
+                ! Define \tilde{theta}_l variable in cloud
+                
+                thlpcld = nbs/cps*psipcld ! \theta_l'
+                !thltcld(i,j,k) = mu*epsb*thlpcld ! \tilde{\theta}_l
+                thltcld(i,j,k) = mu*Hl*thlb_zNSMR*(thlpcld/nbs) ! \tilde{\theta}_l
+
+                ! Define \tilde{theta}_l variable in clear
+                
+                thlpclr = nbs/cps*psipclr ! \theta_l'
+                !thltclr(i,j,k) = mu*epsb*thlpclr ! \tilde{\theta}_l
+                thltclr(i,j,k) = mu*Hl*thlb_zNSMR*(thlpclr/nbs) ! \tilde{\theta}_l
+                
+                if(zh(i,j,k).lt.Hl)then
+                   
+                   rlp = 1/(1+Lambda)*(rtpcld - thlpcld) + &
+                        1/(1+Lambda)*alpha/Hl*(zh(i,j,k) - Hl) ! r_l'
+                   
+                else ! in cloud region
+                   
+                   rlp = 1/(1+Lambda)*(rtpcld - thlpcld) ! r_l'
+                   
+                endif
+                
+                rlt = xlv/rv/T0*mu*epsb*rlp ! \tilde{r}_l
+                rlhp =  qvSat(i,j,k)*rlt ! \hat{r}_l'
+             
+                ! define liquid water indicator function (note this
+                ! functions is less than 0 where no cloud exists)
+                rlindctr(i,j,k) = qc0(i,j,k) + rlhp             
+                
+             enddo
+          enddo
+       enddo
+          
+       ! initialize scalar fields (xh,yh,zh locations)
+
+       !do j=jb,je
+       !   do i=ib,ie         
+       !      do k=kb,ke
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+
+
+                ! define psi'
+                if (rlindctr(i,j,k).le.0.0) then ! in clear region
+
+                   psip = PsiCoef*sin(mClear/Hl*zh(i,j,k))/ &
+                        sin(mClear)*cos(kwv/Hl*xh(i)) 
+                        
+                   
+                else ! in cloud region
+
+                   psip = PsiCoef* &
+                        sinh(mCloud/Hl*(zh(i,j,k)-Ht))/ &
+                        sinh(mCloud/Hl*(Hl - Ht))*cos(kwv/Hl*xh(i))
+                   
+                endif
+
+                
+                ! define boussinesq total water content perturbation
+                rtp = -Rbar0/cps*psip ! r_T'
+                rtt = mu*Hl*rTb_zNSMR*(rtp/(-Rbar0)) ! \tilde{r}_T
+                rthp = qvSat(i,j,k)*rtt ! \hat{r}_T'
+                rt = qv0(i,j,k) + qc0(i,j,k) + rthp ! total r_T
+
+
+                ! define boussinesq liquid water potential
+                ! temperature perturbation
+                thlp = nbs/cps*psip ! \theta_l'
+                !thlt = mu*epsb*thlp ! \tilde{\theta}_l
+                thlt = mu*Hl*thlb_zNSMR*(thlp/nbs) ! \tilde{\theta}_l
+
+                ! Fix rl kink by adding to rlp. This should fix the
+                ! theta initialization too in the cloud region.
+                ! Temperature cares about the rlp. This is missed
+                ! when added to qc as in the next code block.
+
+                   
+                ! define boussinesq liquid water mixing ratio
+                ! perturbation for temperature pertutbation
+                if (rlindctr(i,j,k).le.0.0) then ! in clear region
+                   
+                   rlp = 0 ! r_l'
+                   
+                   ! In cloud where interface is displaced downward
+                elseif(rlindctr(i,j,k).gt.0.0.and.zh(i,j,k).lt.Hl)then
+                   
+                   rlp = 1/(1+Lambda)*(rtp - thlp) + &
+                        1/(1+Lambda)*alpha/Hl*(zh(i,j,k) - Hl) ! r_l'
+                   
+                else ! in cloud region
+                   
+                   rlp = 1/(1+Lambda)*(rtp - thlp) ! r_l'
+                   
+                endif
+                
+                rlt = xlv/rv/T0*mu*epsb*rlp ! \tilde{r}_l
+                rlhp =  qvSat(i,j,k)*rlt ! \hat{r}_l'
+                
+                
+                ! define cm1 liquid/vapour mixing ratio from
+                ! Boussinesq
+                if(rlindctr(i,j,k).le.0.0)then ! in clear region
+                   
+                   
+                   qa(i,j,k,nqv) = rt
+                   qa(i,j,k,nqc) = 0.0
+                   
+                   
+                else ! in cloud region
+                   
+                   
+                   qa(i,j,k,nqc) = qc0(i,j,k) + rlhp
+                   qa(i,j,k,nqv) = rt - qa(i,j,k,nqc)
+                   
+                   
+                endif
+                
+                
+                ! define boussinesq temperature perturbation
+                Tp = thlp + Lambda*rlp ! T'
+                Tt = mu*epsb*Tp ! \tilde{T}
+                Thp = tSat(i,j,k)*Tt ! \hat{T}'
+                Th = th0(i,j,k)*pi0(i,j,k) ! \hat{T}
+                T = Th + Thp ! total T
+                
+                
+                ! define cm1 potential temperature perturbation
+                !tha(i,j,k) = th0(i,j,k)*((1+thlt)* &
+                !     exp(xlv/cp*qa(i,j,k,nqc)/T)/ &
+                !     exp(xlv/cp*qc0(i,j,k)/Th) - 1)
+                
+                tha(i,j,k) = th0(i,j,k)*((1+thlt)* &
+                     exp(-xlv/cp*(qc0(i,j,k)/Th - qa(i,j,k,nqc)/T)) - 1)
+                            
+                
+                ! end scalar field Boussinesq initialization
+                ! (qv,ql,theta) for initial guess
+                
+                ! Begin itteration for thermodynamic consistency.
+                ! Only itterate through cloud equations to avoid
+                ! cycles. Negitive cloud water is generated indicates
+                ! clear conditions to be fixed at stopping criteria
+
+                if(zh(i,j,k).ge.Hl*(1-2*delta))then
+                   ncount = 0;
+                   cyclcount = 0;
+                   rsat_oldold = 0;
+                   rsat_old = rslf(prs0(i,j,k),Th)
+                   do
+                      ncount = ncount + 1
+                      
+                      T = (th0(i,j,k) + tha(i,j,k))*pi0(i,j,k)
+                      
+                      rsat_new = rslf(prs0(i,j,k),T)
+                      
+                      ! Cloud equations
+                      
+                      qa(i,j,k,nqv) = rsat_new
+                      qa(i,j,k,nqc) = rtcld(i,j,k) - rsat_new
+                      
+                      tha(i,j,k) = th0(i,j,k)*((1+thltcld(i,j,k))* &
+                           exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                           qa(i,j,k,nqc)/T)) - 1)
+                      
+                      
+                      ! Stopping criteria
+                      ! 1e-5 is currently the best I can do.
+                      if(abs((rsat_new - rsat_old)/rsat_new).lt.1e-5)then
+                         
+                         ! write(*,*) 'converged at'
+                         ! write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
+                         !      'itterations =', ncount
+                         
+                         ! fix to clear for negative cloud water
+                         if(qa(i,j,k,nqc).lt.0.0)then
+                            
+                            qa(i,j,k,nqv) = rtclr(i,j,k)
+                            qa(i,j,k,nqc) = 0.0
+                            
+                            tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
+                                 exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                                 qa(i,j,k,nqc)/T)) - 1)
+                            
+                         endif
+                         
+                         exit
+                         
+                         ! elseif(ncount.gt.500.and. &
+                         !      rsat_oldold.eq.rsat_new.and. &
+                         !      qa(i,j,k,nqc).lt.0.0)then
+                         
+                         !    write(*,*) '2-cycle found in clear skipping'
+                         !    write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
+                         !         'itterations =', ncount
+                         
+                         !    exit
+                         
+                         
+                      elseif(ncount.gt.500)then
+                         
+                         write(*,*) 'iinit 1010 itteration did not &
+                              &converge'
+                         write(*,*) 'For x=',xh(i),'z=',zh(i,j,k), &
+                              'itterations =', ncount
+                         write(*,*) 'rsat_oldold', rsat_oldold, &
+                              'rsat_old', rsat_old, &
+                              'rsat_new', rsat_new
+                         
+                         stop
+                         
+                      else
+                         
+                         ! if(xh(i).eq.-2851.23340.and. &
+                         !      zh(i,j,k).eq.2229.16650)then
+                         !    write(*,*) 'x=',xh(i),'z=',zh(i,j,k), &
+                         !         'ncount=',ncount
+                         !    write(*,*) 'rsat_old', rsat_old, &
+                         !         'rsat_new', rsat_new
+                         !    write(*,*) 'liquid=', qa(i,j,k,nqc)
+                         
+                         ! endif
+                         
+                         rsat_oldold = rsat_old
+                         rsat_old = rsat_new
+                         
+                      endif
+                      
+                   enddo ! itteration end do
+
+                else
+
+                   qa(i,j,k,nqv) = rtclr(i,j,k)
+                   qa(i,j,k,nqc) = 0.0
+                   
+                   tha(i,j,k) = th0(i,j,k)*((1+thltclr(i,j,k))* &
+                        exp(-xlv/cp*(qc0(i,j,k)/Th - &
+                        qa(i,j,k,nqc)/T)) - 1)
+                   
+                endif
+
+             enddo ! end j
+          enddo ! end i
+       enddo ! end k
+
+
+       ! initialize u field (xf,yh,zh locations)
+
+       !do k=kb,ke
+       !   do j=jb,je
+       !      do i=ib,ie+1
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+
+
+                ! define psi'_z
+                if (zh(i,j,k).gt.Hl) then ! in cloud region
+                   
+                   psip_z = PsiCoef* &
+                        mCloud*cosh(mCloud/Hl*(zh(i,j,k)-Ht))/ &
+                        sinh(mCloud/Hl*(Hl - Ht))*cos(kwv/Hl*xf(i))
+
+                   
+                else ! in clear region
+
+                   psip_z = PsiCoef*mClear*cos(mClear/Hl*zh(i,j,k))/ &
+                        sin(mClear)*cos(kwv/Hl*xf(i)) 
+                   
+                endif
+
+                ! This was original
+                ua(i,j,k) = -uScale*psip_z ! \hat{u}
+                !ua(i,j,k) = 0.0 ! \hat{u}
+                
+             enddo
+          enddo
+       enddo
+
+
+       ! initialize w field (xh,yh,zf locations)
+
+       !do k=kb,ke+1
+       !   do j=jb,je
+       !      do i=ib,ie         
+       do j=1,nj+1
+          do i=1,ni+1         
+             do k=1,nk+1
+
+
+                ! if (k.gt.1.and.qa(i,j,k,nqc).gt.0.and. &
+                !      qa(i,j,k-1,nqc).le.0.0) then
+
+                !    ! Extrapolate ql linearly to zf(i,j,k) using values
+                !    ! at zh(i,j,k) and zh(i,j,k+1)
+                !    qlinterp = ((qa(i,j,k+1,nqc) - qa(i,j,k,nqc))/dz)* &
+                !         (zf(i,j,k) - zh(i,j,k)) + qa(i,j,k,nqc)
+                   
+                !    ! define psi'_x
+                !    if (qlinterp.gt.0.0) then ! in cloud region
+                      
+                !       psip_x = -kwv*PsiCoef* &
+                !            sinh(mCloud/Hl*(zf(i,j,k)-Ht))/ &
+                !            sinh(mCloud/Hl*(Hl - Ht))*sin(kwv/Hl*xh(i)) 
+                      
+                !    else ! in clear region
+                      
+                !       psip_x = -kwv*PsiCoef*sin(mClear/Hl*zf(i,j,k))/ &
+                !            sin(mClear)*sin(kwv/Hl*xh(i)) 
+                      
+                !    endif
+                   
+                !    ! write( *, * ) 
+                !    ! write( *, * ) 
+                !    ! write( *, * ) 'i = ', i, 'j = ', j, 'k = ', k
+                !    ! write( *, * ) 'zf = ', zf(i,j,k), 'zh = ', zh(i,j,k)
+                !    ! write( *, * ) 'zhijk = ' , zh(i,j,k), &
+                !    !      'zhijk-1 = ' , zh(i,j,k-1)
+                !    ! write( *, * ) 'qak+1 = ', qa(i,j,k+1,nqc), &
+                !    !      'qak = ', qa(i,j,k,nqc), &
+                !    !      'qak-1/2 = ', qlinterp, &
+                !    !      'qak-1 = ', qa(i,j,k-1,nqc)
+                !    ! write( *, * ) 'dz = ', dz
+                !    ! write( *, * )
+                !    ! write( *, * )
+                !    ! read( *, * ) 
+                   
+
+                   
+                ! else
+                   
+                   
+                   ! define psi'_x
+                   if (zf(i,j,k).gt.Hl) then ! in cloud region
+                      
+                      psip_x = -kwv*PsiCoef* &
+                           sinh(mCloud/Hl*(zf(i,j,k)-Ht))/ &
+                           sinh(mCloud/Hl*(Hl - Ht))*sin(kwv/Hl*xh(i)) 
+                      
+                   else ! in clear region
+                      
+                      psip_x = -kwv*PsiCoef*sin(mClear/Hl*zf(i,j,k))/ &
+                           sin(mClear)*sin(kwv/Hl*xh(i)) 
+                      
+                   endif
+                   
+                ! endif
+                
                 ! This was original
                 wa(i,j,k) = uScale*psip_x
                 !wa(i,j,k) = 0.0
